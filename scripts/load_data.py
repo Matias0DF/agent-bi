@@ -23,7 +23,7 @@ TABLES = {
 
 def sql_type(column: str, dtype) -> str:
     """Traduce el tipo de pandas a un tipo de Postgres."""
-    if "timestamp" in column or "date" in column:
+    if "timestamp" in column or "date" in column or column.endswith("_at"):
         return "TIMESTAMP"
     if pd.api.types.is_integer_dtype(dtype):
         return "BIGINT"

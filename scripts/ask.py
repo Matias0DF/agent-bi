@@ -15,7 +15,11 @@ def print_table(columns: list[str], rows: list[tuple]):
 
 def main():
     question = " ".join(sys.argv[1:]) or input("Pregunta: ")
-    answer = generate_sql(question)
+    answer, docs = generate_sql(question)
+
+    print("\nDocumentación usada:")
+    for d in docs:
+        print(f"  - {d['title']} ({d['score']:.3f})")
 
     print(f"\nSQL:\n{answer.sql}\n")
     print(f"Interpretación: {answer.explanation}\n")

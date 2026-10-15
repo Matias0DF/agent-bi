@@ -4,6 +4,7 @@ import anthropic
 from pydantic import BaseModel
 
 from agent_bi.db import get_schema
+from agent_bi.rag import search_docs
 
 MODEL = os.getenv("CLAUDE_MODEL", "claude-opus-5-5")
 
@@ -17,9 +18,15 @@ Esquema:
 Reglas:
 - Solo consultas SELECT, nunca modifiques datos.
 - Usá únicamente las tablas y columnas del esquema.
-- Los montos están en reales brasileños (BRL).
+- Junto con cada pregunta vas a recibir fragmentos de la documentación del negocio.
+  Cuando definan una métrica, un período o una regla, seguilos al pie de la letra.
 - Si la pregunta es ambigua, elegí la interpretación más razonable y explicala en "explanation".
 """
+
+USER_TEMPLATE = """Documentación relevante:
+{context}
+
+Pregunta: {question}"""
 
 
 class SQLAnswer(BaseModel):
@@ -30,8 +37,14 @@ class SQLAnswer(BaseModel):
 _client = anthropic.Anthropic()
 
 
-def generate_sql(question: str) -> SQLAnswer:
-    """Le pide a Claude la consulta SQL que responde la pregunta."""
+def format_context(docs: list[dict]) -> str:
+    """Une los fragmentos recuperados en un solo bloque de texto."""
+    return "\n\n".join(f"### {d['title']}\n{d['content']}" for d in docs)
+
+
+def generate_sql(question: str) -> tuple[SQLAnswer, list[dict]]:
+    """Busca documentación relevante y le pide a Claude la consulta SQL."""
+    docs = search_docs(question)
     response = _client.beta.messages.parse(
         model=MODEL,
         max_tokens=4000,
@@ -39,9 +52,12 @@ def generate_sql(question: str) -> SQLAnswer:
         fallbacks="default",
         output_config={"effort": "medium"},
         system=SYSTEM_PROMPT.format(schema=get_schema()),
-        messages=[{"role": "user", "content": question}],
+        messages=[{
+            "role": "user",
+            "content": USER_TEMPLATE.format(context=format_context(docs), question=question),
+        }],
         output_format=SQLAnswer,
     )
     if response.stop_reason == "refusal":
         raise RuntimeError("El modelo rechazó la pregunta.")
-    return response.parsed_output
+    return response.parsed_output, docs
