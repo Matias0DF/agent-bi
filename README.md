@@ -108,6 +108,8 @@ docker compose up -d --build              # base + app
 
 Abrir http://localhost:8080. Las próximas veces alcanza con `docker compose up -d`.
 
+**Link público temporal** (para una demo remota): `docker compose --profile public up -d` levanta además un [Cloudflare Quick Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/), y `docker logs agent-bi-tunnel` muestra la URL `https://…trycloudflare.com`. El link deja de funcionar al apagarlo con `docker compose --profile public stop tunnel`.
+
 Para desarrollo, sin contenedor: `uv run uvicorn agent_bi.api:app --port 8000` (abrir http://localhost:8000). También por consola: `uv run python scripts/ask.py "¿Qué región vendió más en 2017?"`.
 
 **Como servidor MCP** (Claude Desktop → `claude_desktop_config.json`):

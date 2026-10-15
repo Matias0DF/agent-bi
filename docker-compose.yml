@@ -23,5 +23,14 @@ services:
     depends_on:
       - db
 
+  tunnel:
+    image: cloudflare/cloudflared:2025.4.0
+    container_name: agent-bi-tunnel
+    command: tunnel --no-autoupdate --url http://app:7860
+    depends_on:
+      - app
+    profiles:
+      - public
+
 volumes:
   pgdata:
