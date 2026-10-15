@@ -1,6 +1,6 @@
 import sys
 
-from agent_bi.agent import ask
+from agent_bi.graph import ask
 
 
 def print_table(columns: list[str], rows: list[tuple]):
@@ -27,6 +27,11 @@ def main():
 
     print("\nPasos del agente:")
     print_steps(result.steps)
+    for i, review in enumerate(result.reviews, 1):
+        status = "aprobada" if review["approved"] else "rechazada"
+        print(f"\nRevisión {i}: {status}")
+        for issue in review["issues"]:
+            print(f"  - {issue}")
     print(f"\nRespuesta:\n{result.answer}\n")
     print(f"Gráfico sugerido: {result.chart}\n")
     print_table(result.columns, result.rows)

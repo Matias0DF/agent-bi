@@ -45,6 +45,15 @@ LIMIT %(k)s
 """
 
 
+def get_docs(titles: list[str]) -> list[dict]:
+    """Devuelve fragmentos de documentación por título."""
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT title, content FROM doc_chunks WHERE title = ANY(%s)", (titles,)
+        ).fetchall()
+    return [{"title": t, "content": c} for t, c in rows]
+
+
 def search_docs(question: str, k: int = 5) -> list[dict]:
     """Búsqueda híbrida: combina similitud semántica y palabras clave."""
     query_vector = embed([question])[0]

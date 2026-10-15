@@ -91,42 +91,61 @@ class AgentResult:
     columns: list[str] = field(default_factory=list)
     rows: list[tuple] = field(default_factory=list)
     steps: list[dict] = field(default_factory=list)
+    reviews: list[dict] = field(default_factory=list)
 
 
 _client = anthropic.Anthropic()
 
 
-def _search_docs(query: str, result: AgentResult) -> str:
+def _search_docs(query: str, steps: list) -> str:
     """Ejecuta la herramienta search_docs."""
     docs = search_docs(query)
-    result.steps.append({"tool": "search_docs", "input": query, "output": [d["title"] for d in docs]})
+    steps.append({"tool": "search_docs", "input": query, "output": [d["title"] for d in docs]})
     return "\n\n".join(f"### {d['title']}\n{d['content']}" for d in docs)
 
 
-def _run_sql(sql: str, result: AgentResult) -> str:
+def _run_sql(sql: str, steps: list) -> str:
     """Ejecuta la herramienta run_sql."""
     try:
         columns, rows = run_query(sql)
     except Exception as e:
-        result.steps.append({"tool": "run_sql", "input": sql, "error": str(e)})
+        steps.append({"tool": "run_sql", "input": sql, "error": str(e)})
         raise
-    result.steps.append({"tool": "run_sql", "input": sql, "output": f"{len(rows)} filas"})
+    steps.append({"tool": "run_sql", "input": sql, "output": f"{len(rows)} filas"})
     preview = [dict(zip(columns, r)) for r in rows[:ROWS_FOR_MODEL]]
     return json.dumps({"rows_total": len(rows), "rows": preview}, default=str, ensure_ascii=False)
 
 
-def _execute(block, result: AgentResult) -> dict:
+def execute_tool(block, steps: list) -> dict:
     """Ejecuta un pedido de herramienta y arma el tool_result."""
     try:
         if block.name == "search_docs":
-            content = _search_docs(block.input["query"], result)
+            content = _search_docs(block.input["query"], steps)
         elif block.name == "run_sql":
-            content = _run_sql(block.input["sql"], result)
+            content = _run_sql(block.input["sql"], steps)
         else:
             raise ValueError(f"Herramienta desconocida: {block.name}")
         return {"type": "tool_result", "tool_use_id": block.id, "content": content}
     except Exception as e:
         return {"type": "tool_result", "tool_use_id": block.id, "content": f"Error: {e}", "is_error": True}
+
+
+def call_model(system: str, messages: list):
+    """Le manda la conversación a Claude con las herramientas disponibles."""
+    response = _client.beta.messages.create(
+        model=MODEL,
+        max_tokens=16000,
+        betas=["server-side-fallback-2026-07-01"],
+        fallbacks="default",
+        output_config={"effort": "medium"},
+        cache_control={"type": "ephemeral"},
+        system=system,
+        tools=TOOLS,
+        messages=messages,
+    )
+    if response.stop_reason == "refusal":
+        raise RuntimeError("El modelo rechazó la pregunta.")
+    return response
 
 
 def ask(question: str) -> AgentResult:
@@ -136,20 +155,7 @@ def ask(question: str) -> AgentResult:
     system = SYSTEM_PROMPT.format(schema=get_schema())
 
     for _ in range(MAX_TURNS):
-        response = _client.beta.messages.create(
-            model=MODEL,
-            max_tokens=16000,
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
-            output_config={"effort": "medium"},
-            cache_control={"type": "ephemeral"},
-            system=system,
-            tools=TOOLS,
-            messages=messages,
-        )
-        if response.stop_reason == "refusal":
-            raise RuntimeError("El modelo rechazó la pregunta.")
-
+        response = call_model(system, messages)
         messages.append({"role": "assistant", "content": response.content})
         tool_calls = [b for b in response.content if b.type == "tool_use"]
 
@@ -165,6 +171,6 @@ def ask(question: str) -> AgentResult:
             messages.append({"role": "user", "content": "Para terminar, llamá a submit_answer."})
             continue
 
-        messages.append({"role": "user", "content": [_execute(b, result) for b in tool_calls]})
+        messages.append({"role": "user", "content": [execute_tool(b, result.steps) for b in tool_calls]})
 
     raise RuntimeError(f"El agente no terminó en {MAX_TURNS} turnos.")
