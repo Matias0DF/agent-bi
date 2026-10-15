@@ -2,6 +2,7 @@ services:
   db:
     image: pgvector/pgvector:pg16
     container_name: agent-bi-db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: bi
       POSTGRES_PASSWORD: bi
