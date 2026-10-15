@@ -3,6 +3,8 @@ import os
 import anthropic
 from pydantic import BaseModel
 
+from agent_bi import usage
+from agent_bi.agent import fallback_args
 from agent_bi.db import get_schema
 from agent_bi.rag import search_docs
 
@@ -48,8 +50,7 @@ def generate_sql(question: str) -> tuple[SQLAnswer, list[dict]]:
     response = _client.beta.messages.parse(
         model=MODEL,
         max_tokens=4000,
-        betas=["server-side-fallback-2026-07-01"],
-        fallbacks="default",
+        **fallback_args(MODEL),
         output_config={"effort": "medium"},
         system=SYSTEM_PROMPT.format(schema=get_schema()),
         messages=[{
@@ -60,4 +61,5 @@ def generate_sql(question: str) -> tuple[SQLAnswer, list[dict]]:
     )
     if response.stop_reason == "refusal":
         raise RuntimeError("El modelo rechazó la pregunta.")
+    usage.record(response.model, response.usage)
     return response.parsed_output, docs

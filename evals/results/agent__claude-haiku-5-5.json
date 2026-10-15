@@ -1,0 +1,588 @@
+{
+  "summary": {
+    "variant": "agent",
+    "model": "claude-haiku-5-5",
+    "questions": 30,
+    "correct": 22,
+    "accuracy": 73.3,
+    "cost_usd": 0.036,
+    "avg_seconds": 7.4,
+    "by_difficulty": {
+      "fácil": "9/10",
+      "intermedia": "9/12",
+      "difícil": "4/8"
+    }
+  },
+  "results": [
+    {
+      "id": 1,
+      "difficulty": "fácil",
+      "question": "¿Cuántas órdenes hay registradas en total?",
+      "sql": "SELECT count(*) AS ordenes FROM orders",
+      "correct": true,
+      "error": null,
+      "answer": "En total hay 99.441 órdenes registradas (todas distintas). Si se excluyen las canceladas (625) y las no disponibles (609), quedan 98.207 órdenes que cuentan como venta.",
+      "predicted_sql": "SELECT COUNT(*) AS total_ordenes, COUNT(DISTINCT order_id) AS ordenes_distintas FROM orders;",
+      "seconds": 7.1,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 702,
+        "cache_read": 5821,
+        "cache_write": 4006,
+        "cost_usd": 0.0009
+      }
+    },
+    {
+      "id": 2,
+      "difficulty": "fácil",
+      "question": "¿Cuántos vendedores hay?",
+      "sql": "SELECT count(*) AS vendedores FROM sellers",
+      "correct": true,
+      "error": null,
+      "answer": "Hay 3.095 vendedores registrados en la tabla sellers, sin IDs duplicados. Este conteo incluye a todos los vendedores registrados, sin filtrar por los que tuvieron ventas.",
+      "predicted_sql": "SELECT COUNT(*) AS total_filas, COUNT(DISTINCT seller_id) AS vendedores_distintos FROM sellers;",
+      "seconds": 5.2,
+      "usage": {
+        "calls": 2,
+        "input": 6,
+        "output": 626,
+        "cache_read": 2217,
+        "cache_write": 3482,
+        "cost_usd": 0.0008
+      }
+    },
+    {
+      "id": 3,
+      "difficulty": "fácil",
+      "question": "¿Cuántos clientes únicos hay?",
+      "sql": "SELECT count(DISTINCT customer_unique_id) AS clientes FROM customers",
+      "correct": true,
+      "error": null,
+      "answer": "Hay 96.096 clientes únicos en la base. Este conteo se hizo con customer_unique_id, que identifica a la persona real; customer_id cambia en cada orden, por eso no se usó para contar.",
+      "predicted_sql": "SELECT COUNT(DISTINCT customer_unique_id) AS clientes_unicos FROM customers",
+      "seconds": 6.1,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 444,
+        "cache_read": 5453,
+        "cache_write": 3355,
+        "cost_usd": 0.0007
+      }
+    },
+    {
+      "id": 4,
+      "difficulty": "fácil",
+      "question": "¿Cuál es el puntaje promedio de las reseñas?",
+      "sql": "SELECT round(avg(review_score), 2) AS puntaje FROM order_reviews",
+      "correct": true,
+      "error": null,
+      "answer": "El puntaje promedio de las reseñas es 4,09 sobre 5, calculado sobre 99.224 reseñas. Promediando por orden (cuando una orden tiene más de una reseña) el resultado es el mismo, 4,09.",
+      "predicted_sql": "SELECT ROUND(AVG(review_score),2) AS promedio_por_reseña, COUNT(*) AS cantidad_reseñas, ROUND((SELECT AVG(s) FROM (SELECT AVG(review_score) s FROM order_reviews GROUP BY order_id) t),2) AS promedio_por_orden FROM order_reviews",
+      "seconds": 5.1,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 696,
+        "cache_read": 5408,
+        "cache_write": 3502,
+        "cost_usd": 0.0008
+      }
+    },
+    {
+      "id": 5,
+      "difficulty": "fácil",
+      "question": "¿Qué medio de pago se usa más y en cuántos pagos?",
+      "sql": "SELECT payment_type, count(*) AS pagos\nFROM order_payments GROUP BY 1 ORDER BY 2 DESC LIMIT 1\n",
+      "correct": false,
+      "error": "Solo se permiten consultas SELECT.",
+      "answer": "",
+      "predicted_sql": "",
+      "seconds": 7.9,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 984,
+        "cache_read": 5698,
+        "cache_write": 4047,
+        "cost_usd": 0.0011
+      }
+    },
+    {
+      "id": 6,
+      "difficulty": "fácil",
+      "question": "¿Cuántas órdenes fueron canceladas?",
+      "sql": "SELECT count(*) AS canceladas FROM orders WHERE order_status = 'canceled'",
+      "correct": true,
+      "error": null,
+      "answer": "Se cancelaron 625 órdenes en total (order_status = 'canceled', contadas por order_id único). Estas órdenes no cuentan como venta, según la definición del negocio.",
+      "predicted_sql": "SELECT COUNT(DISTINCT order_id) AS ordenes_canceladas FROM orders WHERE order_status = 'canceled'",
+      "seconds": 4.6,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 462,
+        "cache_read": 5548,
+        "cache_write": 3460,
+        "cost_usd": 0.0007
+      }
+    },
+    {
+      "id": 7,
+      "difficulty": "fácil",
+      "question": "¿Qué estado tiene más clientes únicos y cuántos?",
+      "sql": "SELECT customer_state, count(DISTINCT customer_unique_id) AS clientes\nFROM customers GROUP BY 1 ORDER BY 2 DESC LIMIT 1\n",
+      "correct": true,
+      "error": null,
+      "answer": "São Paulo (SP) es el estado con más clientes únicos: 40.302 personas distintas, medidas por customer_unique_id. Le siguen Rio de Janeiro (RJ) con 12.384 y Minas Gerais (MG) con 11.259.</answer>\n<parameter name=\"sql\">SELECT customer_state, COUNT(DISTINCT customer_unique_id) AS clientes_unicos FROM customers GROUP BY customer_state ORDER BY clientes_unicos DESC LIMIT 5",
+      "predicted_sql": "SELECT customer_state, COUNT(DISTINCT customer_unique_id) AS clientes_unicos FROM customers GROUP BY customer_state ORDER BY clientes_unicos DESC LIMIT 5",
+      "seconds": 6.5,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 702,
+        "cache_read": 6468,
+        "cache_write": 4512,
+        "cost_usd": 0.001
+      }
+    },
+    {
+      "id": 8,
+      "difficulty": "fácil",
+      "question": "¿Cuántas categorías de producto existen?",
+      "sql": "SELECT count(DISTINCT product_category_name) AS categorias FROM products",
+      "correct": true,
+      "error": null,
+      "answer": "Hay 73 categorías de producto distintas en la tabla de productos (sin contar los 610 productos que no tienen categoría asignada). De esas, 71 tienen traducción al inglés en category_translation; las otras 2 aparecen con su nombre original en portugués.",
+      "predicted_sql": "SELECT COUNT(DISTINCT p.product_category_name) AS categorias_distintas_en_products, COUNT(DISTINCT p.product_category_name) FILTER (WHERE t.product_category_name_english IS NOT NULL) AS con_traduccion, COUNT(*) FILTER (WHERE p.product_category_name IS NULL) AS productos_sin_categoria FROM products p LEFT JOIN category_translation t ON t.product_category_name = p.product_category_name",
+      "seconds": 8.3,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 938,
+        "cache_read": 5567,
+        "cache_write": 3733,
+        "cost_usd": 0.001
+      }
+    },
+    {
+      "id": 9,
+      "difficulty": "fácil",
+      "question": "¿Cuánto se vendió en total en 2017?",
+      "sql": "SELECT round(sum(oi.price + oi.freight_value), 2) AS gmv\nFROM orders o JOIN order_items oi ON oi.order_id = o.order_id\nWHERE o.order_status NOT IN ('canceled', 'unavailable')\n  AND o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01'\n",
+      "correct": true,
+      "error": null,
+      "answer": "En 2017 se vendieron R$ 7.090.569,24 en total (GMV: precio más flete de los ítems de órdenes con fecha de compra en 2017, excluyendo órdenes canceladas o no disponibles). Si se quiere solo el valor de productos, sin flete, habría que usar únicamente el precio de los ítems.</answer>\n<parameter name=\"sql\">SELECT ROUND(SUM(oi.price + oi.freight_value)::numeric, 2) AS gmv_2017\nFROM order_items oi\nJOIN orders o ON o.order_id = oi.order_id\nWHERE o.order_status NOT IN ('canceled', 'unavailable')\n  AND o.order_purchase_timestamp >= '2017-01-01'\n  AND o.order_purchase_timestamp < '2018-01-01'",
+      "predicted_sql": "SELECT ROUND(SUM(oi.price + oi.freight_value)::numeric, 2) AS gmv_2017 FROM order_items oi JOIN orders o ON o.order_id = oi.order_id WHERE o.order_status NOT IN ('canceled', 'unavailable') AND o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01'",
+      "seconds": 6.4,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 873,
+        "cache_read": 5665,
+        "cache_write": 3683,
+        "cost_usd": 0.001
+      }
+    },
+    {
+      "id": 10,
+      "difficulty": "fácil",
+      "question": "¿Cuántas órdenes se vendieron en 2018?",
+      "sql": "SELECT count(*) AS ordenes FROM orders\nWHERE order_status NOT IN ('canceled', 'unavailable')\n  AND order_purchase_timestamp >= '2018-01-01' AND order_purchase_timestamp < '2019-01-01'\n",
+      "correct": true,
+      "error": null,
+      "answer": "En 2018 se vendieron 53.532 órdenes (contando las órdenes distintas que no están canceladas ni no disponibles). Aclaración: la base tiene datos completos solo hasta agosto de 2018, y septiembre y octubre tienen muy pocas órdenes, así que esa cifra anual está algo subestimada en esos meses.",
+      "predicted_sql": "SELECT COUNT(DISTINCT order_id) AS ordenes_2018 FROM orders WHERE order_purchase_timestamp >= '2018-01-01' AND order_purchase_timestamp < '2019-01-01' AND order_status NOT IN ('canceled','unavailable')",
+      "seconds": 5.6,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 754,
+        "cache_read": 5659,
+        "cache_write": 3619,
+        "cost_usd": 0.0009
+      }
+    },
+    {
+      "id": 11,
+      "difficulty": "intermedia",
+      "question": "¿Cuáles fueron las 5 categorías con más ventas en 2017? Nombres en inglés.",
+      "sql": "SELECT ct.product_category_name_english AS categoria, round(sum(oi.price + oi.freight_value), 2) AS gmv\nFROM orders o\nJOIN order_items oi ON oi.order_id = o.order_id\nJOIN products p ON p.product_id = oi.product_id\nLEFT JOIN category_translation ct ON ct.product_category_name = p.product_category_name\nWHERE o.order_status NOT IN ('canceled', 'unavailable')\n  AND o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01'\nGROUP BY 1 ORDER BY 2 DESC LIMIT 5\n",
+      "correct": true,
+      "error": null,
+      "answer": "Las 5 categorías con más ventas en 2017 (GMV = precio + flete, sin órdenes canceladas ni unavailable, por fecha de compra) fueron: bed_bath_table (R$ 589.698,39), health_beauty (R$ 549.590,83), sports_leisure (R$ 525.556,12), watches_gifts (R$ 523.487,40) y computers_accessories (R$ 457.876,20). Si lo que buscabas es solo el precio sin flete, el ranking podría cambiar.</answer>\n<parameter name=\"sql\">SELECT COALESCE(t.product_category_name_english, p.product_category_name, 'unknown') AS category,\n       ROUND(SUM(oi.price + oi.freight_value)::numeric, 2) AS gmv_brl,\n       COUNT(*) AS items\nFROM order_items oi\nJOIN orders o ON o.order_id = oi.order_id\nLEFT JOIN products p ON p.product_id = oi.product_id\nLEFT JOIN category_translation t ON t.product_category_name = p.product_category_name\nWHERE o.order_status NOT IN ('canceled','unavailable')\n  AND o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01'\nGROUP BY 1\nORDER BY gmv_brl DESC\nLIMIT 5;",
+      "predicted_sql": "SELECT COALESCE(t.product_category_name_english, p.product_category_name, 'unknown') AS category, ROUND(SUM(oi.price + oi.freight_value)::numeric, 2) AS gmv_brl, COUNT(*) AS items FROM order_items oi JOIN orders o ON o.order_id = oi.order_id LEFT JOIN products p ON p.product_id = oi.product_id LEFT JOIN category_translation t ON t.product_category_name = p.product_category_name WHERE o.order_status NOT IN ('canceled','unavailable') AND o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01' GROUP BY 1 ORDER BY gmv_brl DESC LIMIT 5;",
+      "seconds": 7.3,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 1396,
+        "cache_read": 6991,
+        "cache_write": 5278,
+        "cost_usd": 0.0014
+      }
+    },
+    {
+      "id": 12,
+      "difficulty": "intermedia",
+      "question": "¿Cuánto vendió cada región de Brasil entre enero y agosto de 2018?",
+      "sql": "SELECT CASE\n         WHEN c.customer_state IN ('AC','AP','AM','PA','RO','RR','TO') THEN 'Norte'\n         WHEN c.customer_state IN ('AL','BA','CE','MA','PB','PE','PI','RN','SE') THEN 'Nordeste'\n         WHEN c.customer_state IN ('DF','GO','MT','MS') THEN 'Centro-Oeste'\n         WHEN c.customer_state IN ('ES','MG','RJ','SP') THEN 'Sudeste'\n         ELSE 'Sul' END AS region,\n       round(sum(oi.price + oi.freight_value), 2) AS gmv\nFROM orders o\nJOIN order_items oi ON oi.order_id = o.order_id\nJOIN customers c ON c.customer_id = o.customer_id\nWHERE o.order_status NOT IN ('canceled', 'unavailable')\n  AND o.order_purchase_timestamp >= '2018-01-01' AND o.order_purchase_timestamp < '2018-09-01'\nGROUP BY 1 ORDER BY 2 DESC\n",
+      "correct": true,
+      "error": null,
+      "answer": "Entre enero y agosto de 2018, el Sudeste fue la región con mayores ventas: R$ 5.619.621,65 (37.303 órdenes), seguido por el Sul con R$ 1.238.493,27 y el Nordeste con R$ 987.040,08. Le siguen el Centro-Oeste (R$ 544.093,85) y el Norte (R$ 203.888,65). Las ventas se calcularon como GMV (precio + flete), excluyendo órdenes canceladas o no disponibles, y agrupando por estado del cliente en las 5 regiones oficiales.",
+      "predicted_sql": "SELECT CASE\n  WHEN c.customer_state IN ('AC','AP','AM','PA','RO','RR','TO') THEN 'Norte'\n  WHEN c.customer_state IN ('AL','BA','CE','MA','PB','PE','PI','RN','SE') THEN 'Nordeste'\n  WHEN c.customer_state IN ('DF','GO','MT','MS') THEN 'Centro-Oeste'\n  WHEN c.customer_state IN ('ES','MG','RJ','SP') THEN 'Sudeste'\n  WHEN c.customer_state IN ('PR','RS','SC') THEN 'Sul'\n  ELSE 'Otro/Desconocido' END AS region,\n  ROUND(SUM(oi.price + oi.freight_value)::numeric, 2) AS gmv_brl,\n  COUNT(DISTINCT o.order_id) AS ordenes\nFROM orders o\nJOIN customers c ON c.customer_id = o.customer_id\nJOIN order_items oi ON oi.order_id = o.order_id\nWHERE o.order_status NOT IN ('canceled','unavailable')\n  AND o.order_purchase_timestamp >= '2018-01-01'\n  AND o.order_purchase_timestamp < '2018-09-01'\nGROUP BY 1\nORDER BY gmv_brl DESC",
+      "seconds": 7.5,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 1505,
+        "cache_read": 6844,
+        "cache_write": 5327,
+        "cost_usd": 0.0015
+      }
+    },
+    {
+      "id": 13,
+      "difficulty": "intermedia",
+      "question": "¿Cuál fue el ticket promedio en 2017?",
+      "sql": "SELECT round(sum(oi.price + oi.freight_value) / count(DISTINCT o.order_id), 2) AS ticket\nFROM orders o JOIN order_items oi ON oi.order_id = o.order_id\nWHERE o.order_status NOT IN ('canceled', 'unavailable')\n  AND o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01'\n",
+      "correct": true,
+      "error": null,
+      "answer": "El ticket promedio (AOV) de 2017 fue de R$ 159,79. Se calculó como GMV de R$ 7.090.569,24 (precio más flete) dividido por 44.375 órdenes que cuentan como venta (se excluyeron las órdenes canceladas y no disponibles, y se consideró el año completo 2017 por fecha de compra).",
+      "predicted_sql": "SELECT ROUND(SUM(oi.price + oi.freight_value) / COUNT(DISTINCT o.order_id), 2) AS ticket_promedio, SUM(oi.price + oi.freight_value) AS gmv, COUNT(DISTINCT o.order_id) AS ordenes FROM orders o JOIN order_items oi ON oi.order_id = o.order_id WHERE o.order_status NOT IN ('canceled','unavailable') AND o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01'",
+      "seconds": 6.0,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 937,
+        "cache_read": 6652,
+        "cache_write": 4824,
+        "cost_usd": 0.0011
+      }
+    },
+    {
+      "id": 14,
+      "difficulty": "intermedia",
+      "question": "¿Cuál fue el mes de 2017 con más ventas y cuánto se vendió?",
+      "sql": "SELECT to_char(o.order_purchase_timestamp, 'YYYY-MM') AS mes, round(sum(oi.price + oi.freight_value), 2) AS gmv\nFROM orders o JOIN order_items oi ON oi.order_id = o.order_id\nWHERE o.order_status NOT IN ('canceled', 'unavailable')\n  AND o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01'\nGROUP BY 1 ORDER BY 2 DESC LIMIT 1\n",
+      "correct": true,
+      "error": null,
+      "answer": "El mes de 2017 con más ventas fue noviembre de 2017, con un GMV de R$ 1.172.191,68 (precio + flete de los ítems, excluyendo órdenes canceladas o no disponibles). Le siguieron diciembre (R$ 861.526,77) y octubre (R$ 764.756,03).",
+      "predicted_sql": "SELECT to_char(date_trunc('month', o.order_purchase_timestamp), 'YYYY-MM') AS mes, ROUND(SUM(oi.price + oi.freight_value), 2) AS gmv FROM orders o JOIN order_items oi ON oi.order_id = o.order_id WHERE o.order_status NOT IN ('canceled','unavailable') AND EXTRACT(YEAR FROM o.order_purchase_timestamp) = 2017 GROUP BY 1 ORDER BY gmv DESC",
+      "seconds": 7.2,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 782,
+        "cache_read": 5736,
+        "cache_write": 4043,
+        "cost_usd": 0.001
+      }
+    },
+    {
+      "id": 15,
+      "difficulty": "intermedia",
+      "question": "¿Qué porcentaje de las órdenes entregadas llegó tarde?",
+      "sql": "SELECT round(100.0 * avg((order_delivered_customer_date > order_estimated_delivery_date)::int), 2) AS pct_atraso\nFROM orders\nWHERE order_status = 'delivered' AND order_delivered_customer_date IS NOT NULL\n",
+      "correct": false,
+      "error": "Solo se permiten consultas SELECT.",
+      "answer": "",
+      "predicted_sql": "",
+      "seconds": 5.6,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 884,
+        "cache_read": 6807,
+        "cache_write": 4883,
+        "cost_usd": 0.0011
+      }
+    },
+    {
+      "id": 16,
+      "difficulty": "intermedia",
+      "question": "¿Cuántos días tarda en promedio una entrega?",
+      "sql": "SELECT round(avg(extract(epoch FROM order_delivered_customer_date - order_purchase_timestamp) / 86400)::numeric, 1) AS dias\nFROM orders\nWHERE order_status = 'delivered' AND order_delivered_customer_date IS NOT NULL\n",
+      "correct": true,
+      "error": null,
+      "answer": "En promedio, una entrega tarda 12,56 días desde la compra hasta que el cliente recibe la orden. Se calculó sobre 96.470 órdenes con estado \"delivered\" y fecha de entrega registrada.",
+      "predicted_sql": "SELECT ROUND(AVG(EXTRACT(EPOCH FROM (order_delivered_customer_date - order_purchase_timestamp))/86400)::numeric, 2) AS promedio_dias, COUNT(*) AS ordenes FROM orders WHERE order_status = 'delivered' AND order_delivered_customer_date IS NOT NULL",
+      "seconds": 7.2,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 665,
+        "cache_read": 6781,
+        "cache_write": 4776,
+        "cost_usd": 0.001
+      }
+    },
+    {
+      "id": 17,
+      "difficulty": "intermedia",
+      "question": "Entre los estados con al menos 500 órdenes entregadas, ¿cuál tiene la mayor tasa de atraso?",
+      "sql": "SELECT c.customer_state,\n       round(100.0 * avg((o.order_delivered_customer_date > o.order_estimated_delivery_date)::int), 2) AS pct_atraso\nFROM orders o JOIN customers c ON c.customer_id = o.customer_id\nWHERE o.order_status = 'delivered' AND o.order_delivered_customer_date IS NOT NULL\nGROUP BY 1 HAVING count(*) >= 500 ORDER BY 2 DESC LIMIT 1\n",
+      "correct": true,
+      "error": null,
+      "answer": "El estado con mayor tasa de atraso entre los que tienen al menos 500 órdenes entregadas es Maranhão (MA): 141 de 717 órdenes llegaron después de la fecha estimada, una tasa de 19,67%. Le siguen Ceará (CE) con 15,32% y Bahía (BA) con 14,04%; el promedio más bajo corresponde a Paraná (PR) con 5,00%.",
+      "predicted_sql": "SELECT c.customer_state AS estado, COUNT(*) AS ordenes_entregadas, SUM(CASE WHEN o.order_delivered_customer_date > o.order_estimated_delivery_date THEN 1 ELSE 0 END) AS atrasadas, ROUND(100.0 * SUM(CASE WHEN o.order_delivered_customer_date > o.order_estimated_delivery_date THEN 1 ELSE 0 END) / COUNT(*), 2) AS tasa_atraso_pct FROM orders o JOIN customers c ON c.customer_id = o.customer_id WHERE o.order_status = 'delivered' AND o.order_delivered_customer_date IS NOT NULL GROUP BY c.customer_state HAVING COUNT(*) >= 500 ORDER BY tasa_atraso_pct DESC",
+      "seconds": 6.2,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 1103,
+        "cache_read": 6769,
+        "cache_write": 5794,
+        "cost_usd": 0.0013
+      }
+    },
+    {
+      "id": 18,
+      "difficulty": "intermedia",
+      "question": "¿Cuál es el puntaje promedio de reseñas de las órdenes que llegaron tarde y de las que llegaron a tiempo?",
+      "sql": "SELECT o.order_delivered_customer_date > o.order_estimated_delivery_date AS tarde,\n       round(avg(r.review_score), 2) AS puntaje\nFROM orders o JOIN order_reviews r ON r.order_id = o.order_id\nWHERE o.order_status = 'delivered' AND o.order_delivered_customer_date IS NOT NULL\nGROUP BY 1 ORDER BY 1\n",
+      "correct": false,
+      "error": "Solo se permiten consultas SELECT.",
+      "answer": "",
+      "predicted_sql": "",
+      "seconds": 7.0,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 1245,
+        "cache_read": 6561,
+        "cache_write": 4824,
+        "cost_usd": 0.0013
+      }
+    },
+    {
+      "id": 19,
+      "difficulty": "intermedia",
+      "question": "¿Cuáles son los 3 vendedores que más vendieron en 2018?",
+      "sql": "SELECT oi.seller_id, round(sum(oi.price + oi.freight_value), 2) AS gmv\nFROM orders o JOIN order_items oi ON oi.order_id = o.order_id\nWHERE o.order_status NOT IN ('canceled', 'unavailable')\n  AND o.order_purchase_timestamp >= '2018-01-01' AND o.order_purchase_timestamp < '2019-01-01'\nGROUP BY 1 ORDER BY 2 DESC LIMIT 3\n",
+      "correct": true,
+      "error": null,
+      "answer": "Los 3 vendedores que más vendieron en 2018 (GMV = precio + flete, excluyendo órdenes canceladas o no disponibles) fueron: 1) vendedor 4869f7a5… de Guariba (SP), con R$ 151.292,81; 2) vendedor 955fee92… de São Paulo (SP), con R$ 138.969,24; 3) vendedor 1025f0e2… de São Paulo (SP), con R$ 130.593,12. Aclaración: tomé el año completo 2018; como sep-oct de 2018 tienen pocas órdenes, el ranking no cambia si se limita a enero-agosto.",
+      "predicted_sql": "SELECT oi.seller_id, s.seller_city, s.seller_state,\n       ROUND(SUM(oi.price + oi.freight_value), 2) AS gmv_2018\nFROM order_items oi\nJOIN orders o ON o.order_id = oi.order_id\nLEFT JOIN sellers s ON s.seller_id = oi.seller_id\nWHERE EXTRACT(YEAR FROM o.order_purchase_timestamp) = 2018\n  AND o.order_status NOT IN ('canceled', 'unavailable')\nGROUP BY oi.seller_id, s.seller_city, s.seller_state\nORDER BY gmv_2018 DESC\nLIMIT 3",
+      "seconds": 8.9,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 1322,
+        "cache_read": 7061,
+        "cache_write": 5831,
+        "cost_usd": 0.0015
+      }
+    },
+    {
+      "id": 20,
+      "difficulty": "intermedia",
+      "question": "¿Qué porcentaje de los pagos se hacen con boleto?",
+      "sql": "SELECT round(100.0 * avg((payment_type = 'boleto')::int), 2) AS pct_boleto FROM order_payments\n",
+      "correct": true,
+      "error": null,
+      "answer": "El 19,05% de los pagos se hace con boleto (19.539 de 102.573 pagos en órdenes que cuentan como venta). Si se mide por monto, el boleto representa el 17,96% del valor pagado. Excluí las órdenes canceladas y no disponibles, según la definición de venta de la documentación.",
+      "predicted_sql": "SELECT COUNT(*) AS pagos_total,\n       COUNT(*) FILTER (WHERE p.payment_type = 'boleto') AS pagos_boleto,\n       ROUND(100.0 * COUNT(*) FILTER (WHERE p.payment_type = 'boleto') / COUNT(*), 2) AS pct_boleto_pagos,\n       ROUND(100.0 * SUM(p.payment_value) FILTER (WHERE p.payment_type = 'boleto') / SUM(p.payment_value), 2) AS pct_boleto_monto\nFROM order_payments p\nJOIN orders o ON o.order_id = p.order_id\nWHERE o.order_status NOT IN ('canceled', 'unavailable')",
+      "seconds": 9.0,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 1134,
+        "cache_read": 6802,
+        "cache_write": 5070,
+        "cost_usd": 0.0013
+      }
+    },
+    {
+      "id": 21,
+      "difficulty": "intermedia",
+      "question": "¿En cuántas cuotas se paga en promedio con tarjeta de crédito?",
+      "sql": "SELECT round(avg(payment_installments), 2) AS cuotas FROM order_payments WHERE payment_type = 'credit_card'\n",
+      "correct": true,
+      "error": null,
+      "answer": "En promedio, los pagos con tarjeta de crédito se hacen en 3,51 cuotas. Este valor surge de 75.905 pagos con tarjeta en órdenes que cuentan como venta (excluyendo canceladas y no disponibles), y es igual tanto por pago como por orden. Además, cerca del 33% de esas órdenes se paga en una sola cuota.</answer>\n<parameter name=\"sql\">SELECT ROUND(AVG(p.payment_installments),2) AS cuotas_prom_por_pago, COUNT(*) AS pagos_tarjeta, COUNT(DISTINCT p.order_id) AS ordenes_tarjeta FROM order_payments p JOIN orders o ON o.order_id = p.order_id WHERE p.payment_type = 'credit_card' AND o.order_status NOT IN ('canceled','unavailable')",
+      "predicted_sql": "SELECT ROUND(AVG(p.payment_installments),2) AS cuotas_prom_por_pago FROM order_payments p JOIN orders o ON o.order_id = p.order_id WHERE p.payment_type = 'credit_card' AND o.order_status NOT IN ('canceled','unavailable')",
+      "seconds": 7.9,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 1350,
+        "cache_read": 6512,
+        "cache_write": 5140,
+        "cost_usd": 0.0014
+      }
+    },
+    {
+      "id": 22,
+      "difficulty": "intermedia",
+      "question": "¿Cuántos clientes compraron más de una vez?",
+      "sql": "SELECT count(*) AS recurrentes FROM (\n  SELECT c.customer_unique_id FROM orders o JOIN customers c ON c.customer_id = o.customer_id\n  GROUP BY 1 HAVING count(DISTINCT o.order_id) > 1\n) t\n",
+      "correct": false,
+      "error": null,
+      "answer": "2.888 clientes compraron más de una vez, de un total de 94.990 clientes únicos (tasa de recompra del 3,04%). Para identificar a cada persona usé customer_unique_id, y conté solo órdenes que no están canceladas ni no disponibles.",
+      "predicted_sql": "WITH v AS (\n  SELECT c.customer_unique_id, COUNT(DISTINCT o.order_id) AS n\n  FROM orders o\n  JOIN customers c ON c.customer_id = o.customer_id\n  WHERE o.order_status NOT IN ('canceled','unavailable')\n  GROUP BY c.customer_unique_id\n)\nSELECT COUNT(*) AS clientes_unicos,\n       COUNT(*) FILTER (WHERE n > 1) AS clientes_recurrentes,\n       ROUND(100.0 * COUNT(*) FILTER (WHERE n > 1) / COUNT(*), 2) AS tasa_recompra_pct\nFROM v;",
+      "seconds": 7.9,
+      "usage": {
+        "calls": 4,
+        "input": 10,
+        "output": 987,
+        "cache_read": 9907,
+        "cache_write": 4796,
+        "cost_usd": 0.0012
+      }
+    },
+    {
+      "id": 23,
+      "difficulty": "difícil",
+      "question": "¿Qué región cayó más en ventas el último trimestre, en porcentaje?",
+      "sql": "WITH t AS (\n  SELECT CASE\n           WHEN c.customer_state IN ('AC','AP','AM','PA','RO','RR','TO') THEN 'Norte'\n           WHEN c.customer_state IN ('AL','BA','CE','MA','PB','PE','PI','RN','SE') THEN 'Nordeste'\n           WHEN c.customer_state IN ('DF','GO','MT','MS') THEN 'Centro-Oeste'\n           WHEN c.customer_state IN ('ES','MG','RJ','SP') THEN 'Sudeste'\n           ELSE 'Sul' END AS region,\n         sum(CASE WHEN o.order_purchase_timestamp < '2018-04-01' THEN oi.price + oi.freight_value ELSE 0 END) AS q1,\n         sum(CASE WHEN o.order_purchase_timestamp >= '2018-04-01' THEN oi.price + oi.freight_value ELSE 0 END) AS q2\n  FROM orders o\n  JOIN order_items oi ON oi.order_id = o.order_id\n  JOIN customers c ON c.customer_id = o.customer_id\n  WHERE o.order_status NOT IN ('canceled', 'unavailable')\n    AND o.order_purchase_timestamp >= '2018-01-01' AND o.order_purchase_timestamp < '2018-07-01'\n  GROUP BY 1\n)\nSELECT region, round(100.0 * (q2 - q1) / q1, 2) AS variacion_pct FROM t ORDER BY 2 LIMIT 1\n",
+      "correct": true,
+      "error": null,
+      "answer": "La región que más cayó en ventas en el último trimestre (Q2 2018, abril a junio, comparado con Q1 2018) fue el Norte, con una caída del 13,27%: pasó de R$ 81.833,25 a R$ 70.974,25. Le siguió el Nordeste con -4,01%; Sur, Sudeste y Centro-Oeste crecieron. Las ventas se midieron como GMV (precio + flete, sin órdenes canceladas ni no disponibles), y la región se asignó según el estado del cliente.",
+      "predicted_sql": "WITH base AS (\n  SELECT\n    CASE\n      WHEN c.customer_state IN ('AC','AP','AM','PA','RO','RR','TO') THEN 'Norte'\n      WHEN c.customer_state IN ('AL','BA','CE','MA','PB','PE','PI','RN','SE') THEN 'Nordeste'\n      WHEN c.customer_state IN ('DF','GO','MT','MS') THEN 'Centro-Oeste'\n      WHEN c.customer_state IN ('ES','MG','RJ','SP') THEN 'Sudeste'\n      WHEN c.customer_state IN ('PR','RS','SC') THEN 'Sul'\n    END AS region,\n    CASE\n      WHEN o.order_purchase_timestamp >= '2018-04-01' AND o.order_purchase_timestamp < '2018-07-01' THEN 'Q2'\n      WHEN o.order_purchase_timestamp >= '2018-01-01' AND o.order_purchase_timestamp < '2018-04-01' THEN 'Q1'\n    END AS trimestre,\n    oi.price + oi.freight_value AS valor\n  FROM orders o\n  JOIN customers c ON c.customer_id = o.customer_id\n  JOIN order_items oi ON oi.order_id = o.order_id\n  WHERE o.order_status NOT IN ('canceled','unavailable')\n    AND o.order_purchase_timestamp >= '2018-01-01' AND o.order_purchase_timestamp < '2018-07-01'\n)\nSELECT region,\n  ROUND(SUM(CASE WHEN trimestre='Q1' THEN valor END)::numeric, 2) AS gmv_q1_2018,\n  ROUND(SUM(CASE WHEN trimestre='Q2' THEN valor END)::numeric, 2) AS gmv_q2_2018,\n  ROUND((100.0 * (SUM(CASE WHEN trimestre='Q2' THEN valor END) - SUM(CASE WHEN trimestre='Q1' THEN valor END)) / NULLIF(SUM(CASE WHEN trimestre='Q1' THEN valor END),0))::numeric, 2) AS variacion_pct\nFROM base\nWHERE region IS NOT NULL\nGROUP BY region\nORDER BY variacion_pct ASC",
+      "seconds": 13.4,
+      "usage": {
+        "calls": 4,
+        "input": 10,
+        "output": 3077,
+        "cache_read": 12529,
+        "cache_write": 6821,
+        "cost_usd": 0.0025
+      }
+    },
+    {
+      "id": 24,
+      "difficulty": "difícil",
+      "question": "¿Cuánto crecieron las ventas de enero a agosto de 2018 respecto del mismo período de 2017, en porcentaje?",
+      "sql": "WITH t AS (\n  SELECT sum(CASE WHEN o.order_purchase_timestamp < '2018-01-01' THEN oi.price + oi.freight_value END) AS y2017,\n         sum(CASE WHEN o.order_purchase_timestamp >= '2018-01-01' THEN oi.price + oi.freight_value END) AS y2018\n  FROM orders o JOIN order_items oi ON oi.order_id = o.order_id\n  WHERE o.order_status NOT IN ('canceled', 'unavailable')\n    AND ((o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2017-09-01')\n      OR (o.order_purchase_timestamp >= '2018-01-01' AND o.order_purchase_timestamp < '2018-09-01'))\n)\nSELECT round(100.0 * (y2018 - y2017) / y2017, 2) AS crecimiento_pct FROM t\n",
+      "correct": false,
+      "error": "Solo se permiten consultas SELECT.",
+      "answer": "",
+      "predicted_sql": "",
+      "seconds": 9.1,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 1316,
+        "cache_read": 7004,
+        "cache_write": 5141,
+        "cost_usd": 0.0014
+      }
+    },
+    {
+      "id": 25,
+      "difficulty": "difícil",
+      "question": "¿Cuál es el NPS de la empresa según las reseñas?",
+      "sql": "SELECT round(100.0 * avg((review_score = 5)::int) - 100.0 * avg((review_score <= 3)::int), 2) AS nps\nFROM order_reviews\n",
+      "correct": true,
+      "error": null,
+      "answer": "El NPS de la empresa es de aproximadamente 34,84 puntos. Se calculó sobre las 99.224 reseñas con puntaje: 57,78% son promotoras (puntaje 5) y 22,93% son detractoras (puntaje 1 a 3), según la definición simplificada de la documentación. Aclaración: el cálculo es por reseña, no por orden, y usa la escala simplificada (sin el puntaje 4 como neutro, que no entra en ninguno de los dos grupos).",
+      "predicted_sql": "SELECT COUNT(*) AS total_resenas,\n  SUM(CASE WHEN review_score = 5 THEN 1 ELSE 0 END) AS promotores,\n  SUM(CASE WHEN review_score BETWEEN 1 AND 3 THEN 1 ELSE 0 END) AS detractores,\n  ROUND(100.0 * SUM(CASE WHEN review_score = 5 THEN 1 ELSE 0 END) / COUNT(*), 2) AS pct_promotores,\n  ROUND(100.0 * SUM(CASE WHEN review_score BETWEEN 1 AND 3 THEN 1 ELSE 0 END) / COUNT(*), 2) AS pct_detractores,\n  ROUND(100.0 * (SUM(CASE WHEN review_score = 5 THEN 1 ELSE 0 END) - SUM(CASE WHEN review_score BETWEEN 1 AND 3 THEN 1 ELSE 0 END)) / COUNT(*), 2) AS nps\nFROM order_reviews\nWHERE review_score IS NOT NULL;",
+      "seconds": 7.3,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 1392,
+        "cache_read": 5350,
+        "cache_write": 3811,
+        "cost_usd": 0.0012
+      }
+    },
+    {
+      "id": 26,
+      "difficulty": "difícil",
+      "question": "¿Cuánto se vendió el día de Black Friday de 2017?",
+      "sql": "SELECT round(sum(oi.price + oi.freight_value), 2) AS gmv\nFROM orders o JOIN order_items oi ON oi.order_id = o.order_id\nWHERE o.order_status NOT IN ('canceled', 'unavailable')\n  AND o.order_purchase_timestamp >= '2017-11-24' AND o.order_purchase_timestamp < '2017-11-25'\n",
+      "correct": true,
+      "error": null,
+      "answer": "El día de Black Friday de 2017 (24 de noviembre) el GMV fue de R$ 178.377,63, que incluye precio de productos más flete, en 1.166 órdenes. Sin flete, los ingresos por productos fueron de R$ 152.653,74. Se tomaron las órdenes con fecha de compra ese día, excluyendo las canceladas y no disponibles.</answer>\n<parameter name=\"sql\">SELECT COUNT(DISTINCT o.order_id) AS ordenes,\n       ROUND(SUM(oi.price + oi.freight_value), 2) AS gmv_brl,\n       ROUND(SUM(oi.price), 2) AS ingresos_productos_brl\nFROM orders o\nJOIN order_items oi ON oi.order_id = o.order_id\nWHERE o.order_status NOT IN ('canceled', 'unavailable')\n  AND o.order_purchase_timestamp >= '2017-11-24'\n  AND o.order_purchase_timestamp < '2017-11-25'",
+      "predicted_sql": "SELECT COUNT(DISTINCT o.order_id) AS ordenes, ROUND(SUM(oi.price + oi.freight_value), 2) AS gmv_brl, ROUND(SUM(oi.price), 2) AS ingresos_productos_brl FROM orders o JOIN order_items oi ON oi.order_id = o.order_id WHERE o.order_status NOT IN ('canceled', 'unavailable') AND o.order_purchase_timestamp >= '2017-11-24' AND o.order_purchase_timestamp < '2017-11-25'",
+      "seconds": 7.6,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 1216,
+        "cache_read": 6756,
+        "cache_write": 4941,
+        "cost_usd": 0.0013
+      }
+    },
+    {
+      "id": 27,
+      "difficulty": "difícil",
+      "question": "Entre las categorías con al menos 100 reseñas, ¿cuál tiene el peor puntaje promedio? Nombre en inglés.",
+      "sql": "SELECT ct.product_category_name_english AS categoria, round(avg(r.review_score), 2) AS puntaje\nFROM order_reviews r\nJOIN (SELECT DISTINCT order_id, product_id FROM order_items) oi ON oi.order_id = r.order_id\nJOIN products p ON p.product_id = oi.product_id\nJOIN category_translation ct ON ct.product_category_name = p.product_category_name\nGROUP BY 1 HAVING count(*) >= 100 ORDER BY 2 LIMIT 1\n",
+      "correct": false,
+      "error": "Solo se permiten consultas SELECT.",
+      "answer": "",
+      "predicted_sql": "",
+      "seconds": 9.2,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 1758,
+        "cache_read": 6708,
+        "cache_write": 5867,
+        "cost_usd": 0.0017
+      }
+    },
+    {
+      "id": 28,
+      "difficulty": "difícil",
+      "question": "¿Cuántos ítems tiene en promedio una orden vendida?",
+      "sql": "SELECT round(count(*)::numeric / count(DISTINCT o.order_id), 2) AS items\nFROM orders o JOIN order_items oi ON oi.order_id = o.order_id\nWHERE o.order_status NOT IN ('canceled', 'unavailable')\n",
+      "correct": false,
+      "error": "Solo se permiten consultas SELECT.",
+      "answer": "",
+      "predicted_sql": "",
+      "seconds": 6.7,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 841,
+        "cache_read": 6649,
+        "cache_write": 4755,
+        "cost_usd": 0.0011
+      }
+    },
+    {
+      "id": 29,
+      "difficulty": "difícil",
+      "question": "¿Qué porcentaje de las ventas de 2017 vino de la región Sudeste?",
+      "sql": "SELECT round(100.0 * sum(CASE WHEN c.customer_state IN ('ES','MG','RJ','SP') THEN oi.price + oi.freight_value ELSE 0 END)\n             / sum(oi.price + oi.freight_value), 2) AS pct_sudeste\nFROM orders o\nJOIN order_items oi ON oi.order_id = o.order_id\nJOIN customers c ON c.customer_id = o.customer_id\nWHERE o.order_status NOT IN ('canceled', 'unavailable')\n  AND o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01'\n",
+      "correct": true,
+      "error": null,
+      "answer": "El 63,59% de las ventas de 2017 vino de la región Sudeste (ES, MG, RJ y SP): R$ 4.508.820,61 de un total de R$ 7.090.569,24. Las ventas se calcularon como GMV (precio + flete de cada ítem), excluyendo órdenes canceladas o no disponibles, con fecha de compra en 2017 y región según el estado del cliente.</answer>\n<parameter name=\"sql\">WITH v AS (\n  SELECT c.customer_state AS st, (oi.price + oi.freight_value) AS gmv\n  FROM orders o\n  JOIN order_items oi ON oi.order_id = o.order_id\n  JOIN customers c ON c.customer_id = o.customer_id\n  WHERE o.order_status NOT IN ('canceled','unavailable')\n    AND o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01'\n)\nSELECT ROUND(100.0 * SUM(CASE WHEN st IN ('ES','MG','RJ','SP') THEN gmv ELSE 0 END) / SUM(gmv), 2) AS pct_sudeste,\n       ROUND(SUM(CASE WHEN st IN ('ES','MG','RJ','SP') THEN gmv ELSE 0 END), 2) AS gmv_sudeste,\n       ROUND(SUM(gmv), 2) AS gmv_total\nFROM v",
+      "predicted_sql": "WITH v AS (\n  SELECT c.customer_state AS st, (oi.price + oi.freight_value) AS gmv\n  FROM orders o\n  JOIN order_items oi ON oi.order_id = o.order_id\n  JOIN customers c ON c.customer_id = o.customer_id\n  WHERE o.order_status NOT IN ('canceled','unavailable')\n    AND o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01'\n)\nSELECT ROUND(100.0 * SUM(CASE WHEN st IN ('ES','MG','RJ','SP') THEN gmv ELSE 0 END) / SUM(gmv), 2) AS pct_sudeste,\n       ROUND(SUM(CASE WHEN st IN ('ES','MG','RJ','SP') THEN gmv ELSE 0 END), 2) AS gmv_sudeste,\n       ROUND(SUM(gmv), 2) AS gmv_total\nFROM v",
+      "seconds": 8.4,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 1631,
+        "cache_read": 6956,
+        "cache_write": 5240,
+        "cost_usd": 0.0015
+      }
+    },
+    {
+      "id": 30,
+      "difficulty": "difícil",
+      "question": "¿Cuánto pagó en total el cliente que más gastó, sumando todas sus compras?",
+      "sql": "SELECT round(sum(p.payment_value), 2) AS total\nFROM orders o\nJOIN customers c ON c.customer_id = o.customer_id\nJOIN order_payments p ON p.order_id = o.order_id\nGROUP BY c.customer_unique_id ORDER BY 1 DESC LIMIT 1\n",
+      "correct": false,
+      "error": "Solo se permiten consultas SELECT.",
+      "answer": "",
+      "predicted_sql": "",
+      "seconds": 8.6,
+      "usage": {
+        "calls": 3,
+        "input": 8,
+        "output": 1112,
+        "cache_read": 6894,
+        "cache_write": 5316,
+        "cost_usd": 0.0013
+      }
+    }
+  ]
+}

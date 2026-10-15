@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 import anthropic
 
+from agent_bi import usage
 from agent_bi.db import get_schema, run_query
 from agent_bi.rag import search_docs
 
@@ -120,6 +121,13 @@ class AgentResult:
 _client = anthropic.Anthropic()
 
 
+def fallback_args(model: str) -> dict:
+    """Activa el fallback automático en los modelos que lo soportan."""
+    if "haiku" in model:
+        return {}
+    return {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
+
+
 def _search_docs(query: str, steps: list) -> str:
     """Ejecuta la herramienta search_docs."""
     docs = search_docs(query)
@@ -158,8 +166,7 @@ def call_model(system: str, messages: list):
     response = _client.beta.messages.create(
         model=MODEL,
         max_tokens=16000,
-        betas=["server-side-fallback-2026-07-01"],
-        fallbacks="default",
+        **fallback_args(MODEL),
         output_config={"effort": "medium"},
         cache_control={"type": "ephemeral"},
         system=system,
@@ -168,6 +175,7 @@ def call_model(system: str, messages: list):
     )
     if response.stop_reason == "refusal":
         raise RuntimeError("El modelo rechazó la pregunta.")
+    usage.record(response.model, response.usage)
     return response
 
 

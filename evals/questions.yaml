@@ -1,0 +1,270 @@
+- id: 1
+  difficulty: fácil
+  question: ¿Cuántas órdenes hay registradas en total?
+  sql: SELECT count(*) AS ordenes FROM orders
+
+- id: 2
+  difficulty: fácil
+  question: ¿Cuántos vendedores hay?
+  sql: SELECT count(*) AS vendedores FROM sellers
+
+- id: 3
+  difficulty: fácil
+  question: ¿Cuántos clientes únicos hay?
+  sql: SELECT count(DISTINCT customer_unique_id) AS clientes FROM customers
+
+- id: 4
+  difficulty: fácil
+  question: ¿Cuál es el puntaje promedio de las reseñas?
+  sql: SELECT round(avg(review_score), 2) AS puntaje FROM order_reviews
+
+- id: 5
+  difficulty: fácil
+  question: ¿Qué medio de pago se usa más y en cuántos pagos?
+  sql: |
+    SELECT payment_type, count(*) AS pagos
+    FROM order_payments GROUP BY 1 ORDER BY 2 DESC LIMIT 1
+
+- id: 6
+  difficulty: fácil
+  question: ¿Cuántas órdenes fueron canceladas?
+  sql: SELECT count(*) AS canceladas FROM orders WHERE order_status = 'canceled'
+
+- id: 7
+  difficulty: fácil
+  question: ¿Qué estado tiene más clientes únicos y cuántos?
+  sql: |
+    SELECT customer_state, count(DISTINCT customer_unique_id) AS clientes
+    FROM customers GROUP BY 1 ORDER BY 2 DESC LIMIT 1
+
+- id: 8
+  difficulty: fácil
+  question: ¿Cuántas categorías de producto existen?
+  sql: SELECT count(DISTINCT product_category_name) AS categorias FROM products
+
+- id: 9
+  difficulty: fácil
+  question: ¿Cuánto se vendió en total en 2017?
+  sql: |
+    SELECT round(sum(oi.price + oi.freight_value), 2) AS gmv
+    FROM orders o JOIN order_items oi ON oi.order_id = o.order_id
+    WHERE o.order_status NOT IN ('canceled', 'unavailable')
+      AND o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01'
+
+- id: 10
+  difficulty: fácil
+  question: ¿Cuántas órdenes se vendieron en 2018?
+  sql: |
+    SELECT count(*) AS ordenes FROM orders
+    WHERE order_status NOT IN ('canceled', 'unavailable')
+      AND order_purchase_timestamp >= '2018-01-01' AND order_purchase_timestamp < '2019-01-01'
+
+- id: 11
+  difficulty: intermedia
+  question: ¿Cuáles fueron las 5 categorías con más ventas en 2017? Nombres en inglés.
+  sql: |
+    SELECT ct.product_category_name_english AS categoria, round(sum(oi.price + oi.freight_value), 2) AS gmv
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    JOIN products p ON p.product_id = oi.product_id
+    LEFT JOIN category_translation ct ON ct.product_category_name = p.product_category_name
+    WHERE o.order_status NOT IN ('canceled', 'unavailable')
+      AND o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01'
+    GROUP BY 1 ORDER BY 2 DESC LIMIT 5
+
+- id: 12
+  difficulty: intermedia
+  question: ¿Cuánto vendió cada región de Brasil entre enero y agosto de 2018?
+  sql: |
+    SELECT CASE
+             WHEN c.customer_state IN ('AC','AP','AM','PA','RO','RR','TO') THEN 'Norte'
+             WHEN c.customer_state IN ('AL','BA','CE','MA','PB','PE','PI','RN','SE') THEN 'Nordeste'
+             WHEN c.customer_state IN ('DF','GO','MT','MS') THEN 'Centro-Oeste'
+             WHEN c.customer_state IN ('ES','MG','RJ','SP') THEN 'Sudeste'
+             ELSE 'Sul' END AS region,
+           round(sum(oi.price + oi.freight_value), 2) AS gmv
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    JOIN customers c ON c.customer_id = o.customer_id
+    WHERE o.order_status NOT IN ('canceled', 'unavailable')
+      AND o.order_purchase_timestamp >= '2018-01-01' AND o.order_purchase_timestamp < '2018-09-01'
+    GROUP BY 1 ORDER BY 2 DESC
+
+- id: 13
+  difficulty: intermedia
+  question: ¿Cuál fue el ticket promedio en 2017?
+  sql: |
+    SELECT round(sum(oi.price + oi.freight_value) / count(DISTINCT o.order_id), 2) AS ticket
+    FROM orders o JOIN order_items oi ON oi.order_id = o.order_id
+    WHERE o.order_status NOT IN ('canceled', 'unavailable')
+      AND o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01'
+
+- id: 14
+  difficulty: intermedia
+  question: ¿Cuál fue el mes de 2017 con más ventas y cuánto se vendió?
+  sql: |
+    SELECT to_char(o.order_purchase_timestamp, 'YYYY-MM') AS mes, round(sum(oi.price + oi.freight_value), 2) AS gmv
+    FROM orders o JOIN order_items oi ON oi.order_id = o.order_id
+    WHERE o.order_status NOT IN ('canceled', 'unavailable')
+      AND o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01'
+    GROUP BY 1 ORDER BY 2 DESC LIMIT 1
+
+- id: 15
+  difficulty: intermedia
+  question: ¿Qué porcentaje de las órdenes entregadas llegó tarde?
+  sql: |
+    SELECT round(100.0 * avg((order_delivered_customer_date > order_estimated_delivery_date)::int), 2) AS pct_atraso
+    FROM orders
+    WHERE order_status = 'delivered' AND order_delivered_customer_date IS NOT NULL
+
+- id: 16
+  difficulty: intermedia
+  question: ¿Cuántos días tarda en promedio una entrega?
+  sql: |
+    SELECT round(avg(extract(epoch FROM order_delivered_customer_date - order_purchase_timestamp) / 86400)::numeric, 1) AS dias
+    FROM orders
+    WHERE order_status = 'delivered' AND order_delivered_customer_date IS NOT NULL
+
+- id: 17
+  difficulty: intermedia
+  question: Entre los estados con al menos 500 órdenes entregadas, ¿cuál tiene la mayor tasa de atraso?
+  sql: |
+    SELECT c.customer_state,
+           round(100.0 * avg((o.order_delivered_customer_date > o.order_estimated_delivery_date)::int), 2) AS pct_atraso
+    FROM orders o JOIN customers c ON c.customer_id = o.customer_id
+    WHERE o.order_status = 'delivered' AND o.order_delivered_customer_date IS NOT NULL
+    GROUP BY 1 HAVING count(*) >= 500 ORDER BY 2 DESC LIMIT 1
+
+- id: 18
+  difficulty: intermedia
+  question: ¿Cuál es el puntaje promedio de reseñas de las órdenes que llegaron tarde y de las que llegaron a tiempo?
+  sql: |
+    SELECT o.order_delivered_customer_date > o.order_estimated_delivery_date AS tarde,
+           round(avg(r.review_score), 2) AS puntaje
+    FROM orders o JOIN order_reviews r ON r.order_id = o.order_id
+    WHERE o.order_status = 'delivered' AND o.order_delivered_customer_date IS NOT NULL
+    GROUP BY 1 ORDER BY 1
+
+- id: 19
+  difficulty: intermedia
+  question: ¿Cuáles son los 3 vendedores que más vendieron en 2018?
+  sql: |
+    SELECT oi.seller_id, round(sum(oi.price + oi.freight_value), 2) AS gmv
+    FROM orders o JOIN order_items oi ON oi.order_id = o.order_id
+    WHERE o.order_status NOT IN ('canceled', 'unavailable')
+      AND o.order_purchase_timestamp >= '2018-01-01' AND o.order_purchase_timestamp < '2019-01-01'
+    GROUP BY 1 ORDER BY 2 DESC LIMIT 3
+
+- id: 20
+  difficulty: intermedia
+  question: ¿Qué porcentaje de los pagos se hacen con boleto?
+  sql: |
+    SELECT round(100.0 * avg((payment_type = 'boleto')::int), 2) AS pct_boleto FROM order_payments
+
+- id: 21
+  difficulty: intermedia
+  question: ¿En cuántas cuotas se paga en promedio con tarjeta de crédito?
+  sql: |
+    SELECT round(avg(payment_installments), 2) AS cuotas FROM order_payments WHERE payment_type = 'credit_card'
+
+- id: 22
+  difficulty: intermedia
+  question: ¿Cuántos clientes compraron más de una vez?
+  sql: |
+    SELECT count(*) AS recurrentes FROM (
+      SELECT c.customer_unique_id FROM orders o JOIN customers c ON c.customer_id = o.customer_id
+      GROUP BY 1 HAVING count(DISTINCT o.order_id) > 1
+    ) t
+
+- id: 23
+  difficulty: difícil
+  question: ¿Qué región cayó más en ventas el último trimestre, en porcentaje?
+  sql: |
+    WITH t AS (
+      SELECT CASE
+               WHEN c.customer_state IN ('AC','AP','AM','PA','RO','RR','TO') THEN 'Norte'
+               WHEN c.customer_state IN ('AL','BA','CE','MA','PB','PE','PI','RN','SE') THEN 'Nordeste'
+               WHEN c.customer_state IN ('DF','GO','MT','MS') THEN 'Centro-Oeste'
+               WHEN c.customer_state IN ('ES','MG','RJ','SP') THEN 'Sudeste'
+               ELSE 'Sul' END AS region,
+             sum(CASE WHEN o.order_purchase_timestamp < '2018-04-01' THEN oi.price + oi.freight_value ELSE 0 END) AS q1,
+             sum(CASE WHEN o.order_purchase_timestamp >= '2018-04-01' THEN oi.price + oi.freight_value ELSE 0 END) AS q2
+      FROM orders o
+      JOIN order_items oi ON oi.order_id = o.order_id
+      JOIN customers c ON c.customer_id = o.customer_id
+      WHERE o.order_status NOT IN ('canceled', 'unavailable')
+        AND o.order_purchase_timestamp >= '2018-01-01' AND o.order_purchase_timestamp < '2018-07-01'
+      GROUP BY 1
+    )
+    SELECT region, round(100.0 * (q2 - q1) / q1, 2) AS variacion_pct FROM t ORDER BY 2 LIMIT 1
+
+- id: 24
+  difficulty: difícil
+  question: ¿Cuánto crecieron las ventas de enero a agosto de 2018 respecto del mismo período de 2017, en porcentaje?
+  sql: |
+    WITH t AS (
+      SELECT sum(CASE WHEN o.order_purchase_timestamp < '2018-01-01' THEN oi.price + oi.freight_value END) AS y2017,
+             sum(CASE WHEN o.order_purchase_timestamp >= '2018-01-01' THEN oi.price + oi.freight_value END) AS y2018
+      FROM orders o JOIN order_items oi ON oi.order_id = o.order_id
+      WHERE o.order_status NOT IN ('canceled', 'unavailable')
+        AND ((o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2017-09-01')
+          OR (o.order_purchase_timestamp >= '2018-01-01' AND o.order_purchase_timestamp < '2018-09-01'))
+    )
+    SELECT round(100.0 * (y2018 - y2017) / y2017, 2) AS crecimiento_pct FROM t
+
+- id: 25
+  difficulty: difícil
+  question: ¿Cuál es el NPS de la empresa según las reseñas?
+  sql: |
+    SELECT round(100.0 * avg((review_score = 5)::int) - 100.0 * avg((review_score <= 3)::int), 2) AS nps
+    FROM order_reviews
+
+- id: 26
+  difficulty: difícil
+  question: ¿Cuánto se vendió el día de Black Friday de 2017?
+  sql: |
+    SELECT round(sum(oi.price + oi.freight_value), 2) AS gmv
+    FROM orders o JOIN order_items oi ON oi.order_id = o.order_id
+    WHERE o.order_status NOT IN ('canceled', 'unavailable')
+      AND o.order_purchase_timestamp >= '2017-11-24' AND o.order_purchase_timestamp < '2017-11-25'
+
+- id: 27
+  difficulty: difícil
+  question: Entre las categorías con al menos 100 reseñas, ¿cuál tiene el peor puntaje promedio? Nombre en inglés.
+  sql: |
+    SELECT ct.product_category_name_english AS categoria, round(avg(r.review_score), 2) AS puntaje
+    FROM order_reviews r
+    JOIN (SELECT DISTINCT order_id, product_id FROM order_items) oi ON oi.order_id = r.order_id
+    JOIN products p ON p.product_id = oi.product_id
+    JOIN category_translation ct ON ct.product_category_name = p.product_category_name
+    GROUP BY 1 HAVING count(*) >= 100 ORDER BY 2 LIMIT 1
+
+- id: 28
+  difficulty: difícil
+  question: ¿Cuántos ítems tiene en promedio una orden vendida?
+  sql: |
+    SELECT round(count(*)::numeric / count(DISTINCT o.order_id), 2) AS items
+    FROM orders o JOIN order_items oi ON oi.order_id = o.order_id
+    WHERE o.order_status NOT IN ('canceled', 'unavailable')
+
+- id: 29
+  difficulty: difícil
+  question: ¿Qué porcentaje de las ventas de 2017 vino de la región Sudeste?
+  sql: |
+    SELECT round(100.0 * sum(CASE WHEN c.customer_state IN ('ES','MG','RJ','SP') THEN oi.price + oi.freight_value ELSE 0 END)
+                 / sum(oi.price + oi.freight_value), 2) AS pct_sudeste
+    FROM orders o
+    JOIN order_items oi ON oi.order_id = o.order_id
+    JOIN customers c ON c.customer_id = o.customer_id
+    WHERE o.order_status NOT IN ('canceled', 'unavailable')
+      AND o.order_purchase_timestamp >= '2017-01-01' AND o.order_purchase_timestamp < '2018-01-01'
+
+- id: 30
+  difficulty: difícil
+  question: ¿Cuánto pagó en total el cliente que más gastó, sumando todas sus compras?
+  sql: |
+    SELECT round(sum(p.payment_value), 2) AS total
+    FROM orders o
+    JOIN customers c ON c.customer_id = o.customer_id
+    JOIN order_payments p ON p.order_id = o.order_id
+    GROUP BY c.customer_unique_id ORDER BY 1 DESC LIMIT 1

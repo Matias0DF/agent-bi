@@ -1,15 +1,18 @@
 import json
 import operator
+import os
 from typing import Annotated, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel
 
-from agent_bi.agent import MAX_TURNS, MODEL, SYSTEM_PROMPT, AgentResult, _client, call_model, execute_tool
+from agent_bi.agent import MAX_TURNS, MODEL, SYSTEM_PROMPT, AgentResult, _client, call_model, execute_tool, fallback_args
+from agent_bi import usage
 from agent_bi.db import get_schema, run_query
 from agent_bi.rag import get_docs, search_docs
 
 MAX_REVISIONS = 2
+VALIDATOR_MODEL = os.getenv("VALIDATOR_MODEL", MODEL)
 
 VALIDATOR_PROMPT = """Sos un revisor de calidad de un equipo de datos. Un analista respondió una pregunta de negocio con una consulta SQL.
 Tu trabajo es detectar errores antes de que la respuesta llegue al usuario.
@@ -100,10 +103,9 @@ def validator(state: State) -> dict:
     docs = get_docs(sorted(titles))
     preview = [dict(zip(state["columns"], r)) for r in state["rows"][:20]]
     response = _client.beta.messages.parse(
-        model=MODEL,
+        model=VALIDATOR_MODEL,
         max_tokens=4000,
-        betas=["server-side-fallback-2026-07-01"],
-        fallbacks="default",
+        **fallback_args(VALIDATOR_MODEL),
         output_config={"effort": "medium"},
         system=VALIDATOR_PROMPT,
         messages=[{
@@ -119,6 +121,7 @@ def validator(state: State) -> dict:
         }],
         output_format=Review,
     )
+    usage.record(response.model, response.usage)
     review = response.parsed_output
     update = {"reviews": [review.model_dump()]}
 
