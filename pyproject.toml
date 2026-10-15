@@ -7,6 +7,7 @@ dependencies = [
     "anthropic>=1.14.0",
     "fastembed>=0.9.0",
     "langgraph>=1.2.15",
+    "mcp[cli]>=2.3.0",
     "pandas>=3.0.6",
     "pgvector>=0.5.1",
     "psycopg[binary]>=3.3.6",
