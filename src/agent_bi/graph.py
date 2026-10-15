@@ -171,8 +171,19 @@ def build_graph():
 app = build_graph()
 
 
-def ask(question: str) -> AgentResult:
+def with_history(question: str, history: list[dict]) -> str:
+    """Agrega las preguntas anteriores de la conversación como contexto."""
+    if not history:
+        return question
+    previous = "\n\n".join(
+        f"Pregunta: {h['question']}\nRespuesta: {h['answer']}\nSQL: {h['sql']}" for h in history[-3:]
+    )
+    return f"Conversación previa (usala como contexto):\n{previous}\n\nPregunta actual: {question}"
+
+
+def ask(question: str, history: list[dict] | None = None) -> AgentResult:
     """Corre el grafo completo y devuelve el resultado."""
+    question = with_history(question, history or [])
     state = app.invoke(
         {
             "question": question,

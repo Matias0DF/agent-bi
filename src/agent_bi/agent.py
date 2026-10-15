@@ -25,6 +25,10 @@ La respuesta debe:
 - Contestar la pregunta en 1 a 3 oraciones, en español, con los números clave.
 - Montos en reales (R$), con separador de miles.
 - Si interpretaste algo ambiguo, aclararlo brevemente.
+
+Para el gráfico, diseñá la consulta final pensando en cómo se va a ver:
+- Si comparás períodos o grupos (por ejemplo 2017 vs 2018, Q1 vs Q2), poné cada uno en su propia columna y pasalas todas en "y".
+- Porcentajes en escala 0-100, redondeados a 2 decimales.
 """
 
 TOOLS = [
@@ -64,14 +68,33 @@ TOOLS = [
                 "sql": {"type": "string", "description": "La consulta SQL final que respalda la respuesta."},
                 "chart": {
                     "type": "object",
-                    "description": "Gráfico sugerido para el resultado de la consulta final.",
+                    "description": "Visualización del resultado de la consulta final.",
                     "properties": {
-                        "type": {"type": "string", "enum": ["bar", "line", "pie", "none"]},
-                        "x": {"type": "string", "description": "Columna para el eje X o las categorías."},
-                        "y": {"type": "string", "description": "Columna numérica para el eje Y o los valores."},
+                        "type": {
+                            "type": "string",
+                            "enum": ["bar", "line", "pie", "kpi", "none"],
+                            "description": (
+                                "bar: comparar categorías (una o varias series). "
+                                "line: evolución en el tiempo (una o varias series). "
+                                "pie: proporciones de un total, una sola serie y pocas categorías. "
+                                "kpi: el resultado es uno o pocos números destacados en una sola fila. "
+                                "none: una tabla es más clara que un gráfico."
+                            ),
+                        },
+                        "x": {"type": "string", "description": "Columna de categorías o fechas. Vacío para kpi."},
+                        "y": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Columnas numéricas a mostrar. Varias columnas = varias series (por ejemplo 2017 y 2018).",
+                        },
+                        "format": {
+                            "type": "string",
+                            "enum": ["number", "currency", "percent"],
+                            "description": "currency para montos en R$, percent si los valores ya están en escala 0-100.",
+                        },
                         "title": {"type": "string"},
                     },
-                    "required": ["type", "x", "y", "title"],
+                    "required": ["type", "x", "y", "format", "title"],
                     "additionalProperties": False,
                 },
             },
