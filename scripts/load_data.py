@@ -1,3 +1,4 @@
+import argparse
 import io
 import os
 from pathlib import Path
@@ -51,10 +52,16 @@ def load_table(conn, csv_name: str, table: str) -> int:
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--skip", nargs="*", default=[], help="Tablas a omitir, por ejemplo geolocation")
+    args = parser.parse_args()
+
     load_dotenv()
     with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
         conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
         for csv_name, table in TABLES.items():
+            if table in args.skip:
+                continue
             rows = load_table(conn, csv_name, table)
             print(f"{table:<22} {rows:>9,} filas")
 
