@@ -1,0 +1,10 @@
+[project]
+name = "agent-bi"
+version = "0.1.0"
+description = "Agente que responde preguntas de negocio sobre datos usando SQL y RAG"
+requires-python = ">=3.12"
+dependencies = [
+    "pandas>=3.0.6",
+    "psycopg[binary]>=3.3.6",
+    "python-dotenv>=1.2.4",
+]
