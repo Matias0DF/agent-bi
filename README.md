@@ -1,19 +1,8 @@
----
-title: Agent BI
-emoji: 📊
-colorFrom: indigo
-colorTo: blue
-sdk: docker
-app_port: 7860
-pinned: false
-short_description: Agente de IA que responde preguntas de negocio con SQL
----
-
 # Agent BI
 
 **Un agente de IA que responde preguntas de negocio en lenguaje natural sobre una base de datos real.** Busca las definiciones del negocio, escribe la consulta SQL, un segundo agente la valida, y responde con el número, un gráfico y la evidencia.
 
-> **Demo:** _[link a la demo]_ · pedime el código de acceso
+> **Demo en video:** _[link al video]_ · se levanta en local con un solo comando (`docker compose up`)
 > **Resultado:** acierta **29 de 30 preguntas (96,7%)** de una evaluación propia, a ~USD 0,05 y ~15 s por pregunta.
 
 <!-- GIF de la demo -->
@@ -94,30 +83,32 @@ Resultados completos por pregunta en [`evals/results/`](evals/results). Para cor
 | **El LLM elige el gráfico, el código lo dibuja** | El agente devuelve un spec (`tipo`, `x`, `y[]`, `formato`) y la web decide la presentación: barras horizontales con etiquetas largas, rojo para negativos, tarjetas KPI. Es predecible y no se ejecuta código generado. |
 | **SDK de Anthropic dentro de LangGraph** | LangGraph orquesta el flujo; las llamadas usan el SDK oficial para tener control total (herramientas `strict`, caché de prompt, fallback ante rechazos). |
 | **Seguridad en tres capas** | El código solo acepta `SELECT`, la transacción es de solo lectura con timeout, y en producción la app usa un usuario de Postgres que solo tiene permisos de lectura. |
-| **Embeddings locales** (fastembed, multilingüe) | Sin otra API key y gratis. El costo: ~400 MB de RAM, por eso el deploy está en Hugging Face Spaces y no en un plan de 512 MB. |
+| **Embeddings locales** (fastembed, multilingüe) | Sin otra API key y gratis. El costo: ~400 MB de RAM por el vocabulario multilingüe, que lo deja fuera de los planes de hosting gratuitos de 512 MB. |
 
 **En un entorno productivo con datos de una empresa,** la app usaría autenticación delegada (OAuth *on-behalf-of*) para que cada usuario vea solo los datos que tiene permitidos, en lugar de una cuenta de servicio compartida.
 
 ## Stack
 
-Python 3.12 · Claude (Anthropic SDK) · LangGraph · PostgreSQL + pgvector · fastembed · FastAPI · MCP (Python SDK v2) · Chart.js · Docker · Neon · Hugging Face Spaces · uv
+Python 3.12 · Claude (Anthropic SDK) · LangGraph · PostgreSQL + pgvector · fastembed · FastAPI · MCP (Python SDK v2) · Chart.js · Docker · uv
 
 ## Correrlo localmente
 
-Requisitos: [uv](https://docs.astral.sh/uv/), Docker y una [API key de Anthropic](https://console.anthropic.com).
+Requisitos: Docker, [uv](https://docs.astral.sh/uv/) y una [API key de Anthropic](https://console.anthropic.com).
 
 ```bash
 git clone https://github.com/Matias0DF/agent-bi.git && cd agent-bi
 cp .env.example .env                      # completar ANTHROPIC_API_KEY
-docker compose up -d                      # Postgres + pgvector en el puerto 5433
+docker compose up -d db                   # Postgres + pgvector
 uv sync
 # Descargar el dataset de Kaggle y copiar los CSV a data/raw/
-uv run python scripts/load_data.py        # carga las tablas
+uv run python scripts/load_data.py        # carga las tablas (una sola vez)
 uv run python scripts/index_docs.py       # indexa el diccionario de datos
-uv run uvicorn agent_bi.api:app --port 8000
+docker compose up -d --build              # base + app
 ```
 
-Abrir http://localhost:8000. También por consola: `uv run python scripts/ask.py "¿Qué región vendió más en 2017?"`.
+Abrir http://localhost:8080. Las próximas veces alcanza con `docker compose up -d`.
+
+Para desarrollo, sin contenedor: `uv run uvicorn agent_bi.api:app --port 8000` (abrir http://localhost:8000). También por consola: `uv run python scripts/ask.py "¿Qué región vendió más en 2017?"`.
 
 **Como servidor MCP** (Claude Desktop → `claude_desktop_config.json`):
 

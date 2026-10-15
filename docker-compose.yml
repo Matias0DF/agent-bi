@@ -12,5 +12,16 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  app:
+    build: .
+    container_name: agent-bi-app
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://bi:bi@db:5432/olist
+    ports:
+      - "8080:7860"
+    depends_on:
+      - db
+
 volumes:
   pgdata:
