@@ -33,8 +33,10 @@ def main():
         for issue in review["issues"]:
             print(f"  - {issue}")
     print(f"\nRespuesta:\n{result.answer}\n")
-    print(f"Gráfico sugerido: {result.chart}\n")
-    print_table(result.columns, result.rows)
+    for visual in result.visuals:
+        print(f"[{visual['type']}] {visual['title']}  x={visual['x']} y={visual['y']} series={visual['series']}")
+        print_table(visual["columns"], visual["rows"][:15])
+        print()
 
 
 if __name__ == "__main__":

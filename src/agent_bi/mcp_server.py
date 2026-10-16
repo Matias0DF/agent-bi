@@ -51,7 +51,9 @@ def ask_agent(question: str) -> str:
             "answer": result.answer,
             "sql": result.sql,
             "approved": bool(result.reviews) and result.reviews[-1]["approved"],
-            "rows": [dict(zip(result.columns, r)) for r in result.rows[:50]],
+            "visuals": [
+                {"title": v["title"], "rows": [dict(zip(v["columns"], r)) for r in v["rows"][:50]]} for v in result.visuals
+            ],
         },
         default=str,
         ensure_ascii=False,

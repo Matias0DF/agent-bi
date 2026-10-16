@@ -52,7 +52,7 @@ def check_access(code: str | None, client_ip: str):
 @app.get("/")
 def index():
     """Sirve la interfaz web."""
-    return FileResponse(WEB_DIR / "index.html")
+    return FileResponse(WEB_DIR / "index.html", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/api/health")
@@ -74,9 +74,13 @@ def ask_endpoint(body: AskRequest, request: Request, x_access_code: str | None =
     return {
         "answer": result.answer,
         "sql": result.sql,
-        "chart": result.chart,
-        "columns": result.columns,
-        "rows": [[to_json_value(v) for v in row] for row in result.rows],
+        "visuals": [
+            {
+                **{k: v[k] for k in ("type", "title", "sql", "x", "y", "series", "delta", "format", "columns")},
+                "rows": [[to_json_value(value) for value in row] for row in v["rows"]],
+            }
+            for v in result.visuals
+        ],
         "steps": result.steps,
         "reviews": result.reviews,
         "approved": bool(result.reviews) and result.reviews[-1]["approved"],

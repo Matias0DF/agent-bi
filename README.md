@@ -5,7 +5,7 @@
 > **Demo en video:** _[link al video]_ · se levanta en local con un solo comando (`docker compose up`)
 > **Resultado:** acierta **29 de 30 preguntas (96,7%)** de una evaluación propia, a ~USD 0,05 y ~15 s por pregunta.
 
-<!-- GIF de la demo -->
+![Cómo responde Agent BI: una pregunta normal, un intento de borrar datos y un error que el validador corrige](docs/flujo.gif)
 
 ```
 👤 ¿Qué región cayó más en ventas el último trimestre?
@@ -21,7 +21,7 @@
 - **RAG sobre un diccionario de datos:** el agente busca qué significa "ventas", "último trimestre" o "región" antes de escribir SQL. Sin esto, los modelos adivinan y se equivocan en silencio.
 - **Agente con herramientas:** decide cuándo buscar documentación y cuándo ejecutar SQL, y corrige solo sus errores de SQL.
 - **Validador independiente:** un segundo agente revisa la SQL y el resultado contra la documentación antes de responder.
-- **Respuesta completa:** texto, gráfico elegido por el agente (barras, líneas, torta o KPI), datos, SQL y el paso a paso del razonamiento.
+- **Respuesta completa:** texto y de 1 a 4 visuales elegidos por el agente, cada uno con su propia consulta (KPIs con variación, barras, barras apiladas, evolutivos, combo barras + línea, dispersión, waterfall, heatmap, dona y tabla de detalle), más el SQL y el paso a paso del razonamiento.
 - **Tres formas de uso:** web, API REST y **servidor MCP** (Claude Desktop, Cursor, etc.).
 
 ## Arquitectura
@@ -80,7 +80,7 @@ Resultados completos por pregunta en [`evals/results/`](evals/results). Para cor
 |---|---|
 | **Búsqueda híbrida** (pgvector + full-text de Postgres, fusionadas con RRF) | Con solo búsqueda semántica, la definición de "ventas" quedaba en el puesto 11 de 18 para la pregunta principal. Las palabras clave lo resuelven, y los embeddings encuentran sinónimos ("zona del país" → "regiones"). |
 | **Diccionario de datos como fuente de verdad** | Las reglas de negocio (qué cuenta como venta, que `customer_id` no es la persona, que unir pagos con ítems duplica montos) no están en el esquema. Escribirlas bien mejoró más que cualquier cambio de prompt. |
-| **El LLM elige el gráfico, el código lo dibuja** | El agente devuelve un spec (`tipo`, `x`, `y[]`, `formato`) y la web decide la presentación: barras horizontales con etiquetas largas, rojo para negativos, tarjetas KPI. Es predecible y no se ejecuta código generado. |
+| **El LLM elige los visuales, el código los dibuja** | El agente devuelve, por cada visual, un spec (`tipo`, `sql`, `x`, `y[]`, `series`, `delta`, `formato`) y la web decide la presentación: barras horizontales con etiquetas largas, rojo para negativos, pivoteo de series, escala de color del heatmap. Es predecible y no se ejecuta código generado. |
 | **SDK de Anthropic dentro de LangGraph** | LangGraph orquesta el flujo; las llamadas usan el SDK oficial para tener control total (herramientas `strict`, caché de prompt, fallback ante rechazos). |
 | **Seguridad en tres capas** | El código solo acepta `SELECT`, la transacción es de solo lectura con timeout, y en producción la app usa un usuario de Postgres que solo tiene permisos de lectura. |
 | **Embeddings locales** (fastembed, multilingüe) | Sin otra API key y gratis. El costo: ~400 MB de RAM por el vocabulario multilingüe, que lo deja fuera de los planes de hosting gratuitos de 512 MB. |

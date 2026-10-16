@@ -49,11 +49,22 @@
   .badge { padding: 3px 9px; border-radius: 999px; font-weight: 500; }
   .badge.ok { background: var(--ok-soft); color: var(--ok); }
   .badge.warn { background: var(--warn-soft); color: var(--warn); }
-  .chart { position: relative; height: 300px; margin: 8px 0 16px; }
-  .kpis { display: flex; flex-wrap: wrap; gap: 12px; margin: 8px 0 16px; }
-  .kpi { flex: 1 1 160px; background: var(--accent-soft); border-radius: 12px; padding: 16px 18px; }
-  .kpi-value { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; color: var(--accent); font-variant-numeric: tabular-nums; }
-  .kpi-label { font-size: 13px; color: var(--muted); text-transform: capitalize; }
+  .visuals { display: flex; flex-direction: column; gap: 22px; margin: 6px 0 8px; }
+  .visual-title { margin: 0 0 10px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .chart { position: relative; height: 300px; }
+  .empty { color: var(--muted); font-size: 13px; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+  .kpi { border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent); background: color-mix(in srgb, var(--accent) 7%, transparent);
+    border-radius: 10px; padding: 14px 16px; }
+  .kpi-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .kpi-value { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .kpi-delta { font-size: 12px; font-weight: 600; margin-top: 2px; }
+  .heatmap { display: grid; gap: 3px; overflow-x: auto; font-size: 12px; }
+  .hm-col, .hm-row { color: var(--muted); font-weight: 500; padding: 4px 6px; white-space: nowrap; }
+  .hm-col { text-align: center; }
+  .hm-cell { aspect-ratio: 1.6; min-height: 30px; border-radius: 4px; display: grid; place-items: center; font-variant-numeric: tabular-nums; font-size: 11.5px; }
+  .detail { max-height: 360px; border: 1px solid var(--border); border-radius: 10px; margin-top: 0; }
+  .query-title { margin: 12px 0 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
   details { border-top: 1px solid var(--border); padding: 10px 0 0; margin-top: 10px; }
   summary { cursor: pointer; color: var(--muted); font-size: 13px; font-weight: 500; user-select: none; }
   summary:hover { color: var(--text); }
@@ -62,7 +73,7 @@
   table { border-collapse: collapse; width: 100%; font-size: 13px; }
   th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); white-space: nowrap; }
   th { position: sticky; top: 0; background: var(--surface); color: var(--muted); font-weight: 500; }
-  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   ol.steps { margin: 10px 0 0; padding-left: 20px; font-size: 13px; }
   ol.steps li { margin-bottom: 8px; }
   ol.steps code { font: 12px "JetBrains Mono", monospace; color: var(--muted); }
@@ -179,73 +190,229 @@ function renderSteps(steps, reviews) {
   return `<ol class="steps">${items.join("")}</ol>`;
 }
 
-const PALETTE = ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#14b8a6", "#ef4444"];
+const PALETTE = ["#6366f1", "#0ea5e9", "#10b981", "#f59e0b", "#ec4899", "#8b5cf6", "#14b8a6", "#94a3b8"];
+const POSITIVE = "#10b981";
+const NEGATIVE = "#ef4444";
+
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+
+function color(hex, alpha) {
+  return hex + Math.round(alpha * 255).toString(16).padStart(2, "0");
+}
 
 function formatMetric(v, format) {
   if (typeof v !== "number") return formatValue(v);
-  if (format === "currency") return "R$ " + v.toLocaleString("es-AR", { maximumFractionDigits: v >= 1000 ? 0 : 2 });
+  if (format === "currency") return "R$ " + v.toLocaleString("es-AR", { maximumFractionDigits: Math.abs(v) >= 1000 ? 0 : 2 });
   if (format === "percent") return v.toLocaleString("es-AR", { maximumFractionDigits: 2 }) + "%";
   return v.toLocaleString("es-AR", { maximumFractionDigits: 2 });
 }
 
-function renderKpis(container, data, ys) {
-  const row = data.rows[0];
-  const cards = ys.map(y => {
-    const i = data.columns.indexOf(y);
-    const format = /pct|porc|tasa|percent|ratio/i.test(y) ? "percent" : data.chart.format;
-    return i < 0 ? "" : `<div class="kpi"><div class="kpi-value">${formatMetric(row[i], format)}</div><div class="kpi-label">${escapeHtml(y.replace(/_/g, " "))}</div></div>`;
-  }).join("");
-  container.className = "kpis";
-  container.innerHTML = cards;
+function formatFor(column, visual) {
+  if (/pct|porc|tasa|percent|ratio/i.test(column)) return "percent";
+  if (/orden|cantidad|clientes|count|items|pagos|unidades|vendedores|productos|^n_/i.test(column)) return "number";
+  return visual.y.includes(column) ? visual.format : "number";
 }
 
-function renderVisual(container, data) {
-  const { chart, columns, rows } = data;
-  const ys = [].concat(chart.y || []).filter(y => columns.includes(y));
-  if (chart.type === "none" || !rows.length || !ys.length) { container.remove(); return; }
-  if (chart.type === "kpi" || rows.length === 1) { renderKpis(container, data, ys); return; }
+function prettyLabel(name) {
+  return String(name).replace(/_/g, " ");
+}
 
-  const xi = columns.indexOf(chart.x);
-  if (xi < 0) { container.remove(); return; }
-  const labels = rows.map(r => String(r[xi]));
-  const styles = getComputedStyle(document.documentElement);
-  const muted = styles.getPropertyValue("--muted").trim();
-  const border = styles.getPropertyValue("--border").trim();
-  const isPie = chart.type === "pie";
-  const horizontal = chart.type === "bar" && (rows.length > 8 || Math.max(...labels.map(l => l.length)) > 14);
-  if (horizontal) container.style.height = Math.max(300, rows.length * 34 + 80) + "px";
+function pivot(visual) {
+  const { columns, rows } = visual;
+  const xi = columns.indexOf(visual.x), si = columns.indexOf(visual.series), yi = columns.indexOf(visual.y[0]);
+  const labels = [...new Set(rows.map(r => String(r[xi])))];
+  const names = [...new Set(rows.map(r => String(r[si])))];
+  const matrix = names.map(n => labels.map(l => {
+    const row = rows.find(r => String(r[si]) === n && String(r[xi]) === l);
+    return row ? Number(row[yi]) : null;
+  }));
+  return { labels, names, matrix };
+}
 
-  const datasets = (isPie ? ys.slice(0, 1) : ys).map((y, n) => {
-    const yi = columns.indexOf(y);
-    const values = rows.map(r => Number(r[yi]));
-    const color = PALETTE[n % PALETTE.length];
-    const single = ys.length === 1 && chart.type === "bar";
-    return {
-      label: y.replace(/_/g, " "),
-      data: values,
-      backgroundColor: isPie ? PALETTE : single ? values.map(v => v < 0 ? "#ef4444" : color) : color,
-      borderColor: isPie ? styles.getPropertyValue("--surface").trim() : color,
-      borderRadius: chart.type === "bar" ? 5 : 0,
-      tension: 0, pointRadius: 3, fill: false,
-    };
-  });
+function renderKpis(body, visual) {
+  const { columns, rows } = visual;
+  const di = columns.indexOf(visual.delta);
+  const card = (label, value, format, delta) => {
+    const deltaHtml = typeof delta === "number"
+      ? `<div class="kpi-delta" style="color:${delta >= 0 ? POSITIVE : NEGATIVE}">${delta >= 0 ? "▲" : "▼"} ${formatMetric(Math.abs(delta), "percent")} vs anterior</div>`
+      : "";
+    return `<div class="kpi"><div class="kpi-label">${escapeHtml(prettyLabel(label))}</div><div class="kpi-value">${formatMetric(value, format)}</div>${deltaHtml}</div>`;
+  };
+  const xi = columns.indexOf(visual.x);
+  const cards = rows.length > 1 && xi >= 0
+    ? rows.slice(0, 6).map(r => card(r[xi], r[columns.indexOf(visual.y[0])], formatFor(visual.y[0], visual), di >= 0 ? r[di] : null))
+    : visual.y.filter(y => columns.includes(y)).map((y, i) => card(y, rows[0][columns.indexOf(y)], formatFor(y, visual), di >= 0 && i === 0 ? rows[0][di] : null));
+  body.className = "kpis";
+  body.innerHTML = cards.join("");
+}
 
-  const valueAxis = { ticks: { color: muted, callback: v => formatMetric(v, chart.format) }, grid: { color: border } };
-  const categoryAxis = { ticks: { color: muted, autoSkip: !horizontal }, grid: { display: false } };
-  new Chart(container.querySelector("canvas"), {
-    type: chart.type,
-    data: { labels, datasets },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      indexAxis: horizontal ? "y" : "x",
-      plugins: {
-        legend: { display: isPie || datasets.length > 1, labels: { color: muted } },
-        title: { display: true, text: chart.title, color: muted, font: { weight: 500 } },
-        tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${formatMetric(c.parsed[horizontal ? "x" : "y"] ?? c.parsed, chart.format)}` } },
-      },
-      scales: isPie ? {} : horizontal ? { x: valueAxis, y: categoryAxis } : { x: categoryAxis, y: valueAxis },
+function renderDetailTable(body, visual) {
+  const { columns, rows } = visual;
+  const head = columns.map((c, i) => `<th class="${typeof rows[0][i] === "number" ? "num" : ""}">${escapeHtml(prettyLabel(c))}</th>`).join("");
+  const lines = rows.map(r => `<tr>${r.map((v, i) =>
+    `<td class="${typeof v === "number" ? "num" : ""}">${typeof v === "number" ? formatMetric(v, formatFor(columns[i], visual)) : formatValue(v)}</td>`).join("")}</tr>`).join("");
+  body.className = "table-wrap detail";
+  body.innerHTML = `<table><thead><tr>${head}</tr></thead><tbody>${lines}</tbody></table>`;
+}
+
+function renderHeatmap(body, visual) {
+  const { labels, names, matrix } = pivot(visual);
+  const values = matrix.flat().filter(v => v !== null);
+  const min = Math.min(...values), max = Math.max(...values);
+  const format = formatFor(visual.y[0], visual);
+  const head = `<div class="hm-corner"></div>` + labels.map(l => `<div class="hm-col">${escapeHtml(l)}</div>`).join("");
+  const cells = names.map((n, r) => `<div class="hm-row">${escapeHtml(n)}</div>` + matrix[r].map((v, c) => {
+    const t = v === null || max === min ? 0 : (v - min) / (max - min);
+    const share = v === null ? 0 : Math.round((0.08 + t * 0.82) * 100);
+    return `<div class="hm-cell" style="background:color-mix(in srgb, var(--accent) ${share}%, transparent);color:${t > 0.55 ? "#fff" : "var(--text)"}" title="${escapeHtml(n)} · ${escapeHtml(labels[c])}">${v === null ? "" : formatMetric(v, format)}</div>`;
+  }).join("")).join("");
+  body.className = "heatmap";
+  body.style.gridTemplateColumns = `minmax(90px, auto) repeat(${labels.length}, minmax(64px, 1fr))`;
+  body.innerHTML = head + cells;
+}
+
+function baseOptions(visual, extra = {}) {
+  const muted = cssVar("--muted"), border = cssVar("--border");
+  return {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false, labels: { color: muted, boxWidth: 12 } }, tooltip: {} },
+    scales: {
+      x: { ticks: { color: muted }, grid: { display: false } },
+      y: { ticks: { color: muted, callback: v => formatMetric(v, visual.format) }, grid: { color: border } },
     },
-  });
+    ...extra,
+  };
+}
+
+function renderChart(body, visual) {
+  const { columns, rows, type } = visual;
+  const xi = columns.indexOf(visual.x);
+  const ys = visual.y.filter(y => columns.includes(y));
+  const hasSeries = visual.series && columns.includes(visual.series);
+  const canvas = document.createElement("canvas");
+  body.className = "chart";
+  body.appendChild(canvas);
+  const muted = cssVar("--muted");
+  let config;
+
+  if (type === "pie") {
+    const yi = columns.indexOf(ys[0]);
+    config = {
+      type: "doughnut",
+      data: { labels: rows.map(r => String(r[xi])), datasets: [{ data: rows.map(r => Number(r[yi])), backgroundColor: PALETTE, borderColor: cssVar("--surface"), borderWidth: 2 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: "58%",
+        plugins: {
+          legend: { position: "right", labels: { color: muted, boxWidth: 12 } },
+          tooltip: { callbacks: { label: c => ` ${c.label}: ${formatMetric(c.parsed, visual.format)}` } },
+        },
+      },
+    };
+  } else if (type === "scatter") {
+    const yi = columns.indexOf(ys[0]), li = columns.indexOf(visual.series);
+    const options = baseOptions(visual);
+    options.scales.x.ticks.callback = v => formatMetric(v, "number");
+    options.scales.x.title = { display: true, text: prettyLabel(visual.x), color: muted };
+    options.scales.y.title = { display: true, text: prettyLabel(ys[0]), color: muted };
+    options.plugins.tooltip.callbacks = { label: c => ` ${c.raw.label}  (${formatMetric(c.raw.x, "number")}; ${formatMetric(c.raw.y, visual.format)})` };
+    config = {
+      type: "scatter",
+      data: { datasets: [{
+        data: rows.map(r => ({ x: Number(r[xi]), y: Number(r[yi]), label: li >= 0 ? String(r[li]) : "" })),
+        backgroundColor: color(PALETTE[0], 0.65), pointRadius: 5, pointHoverRadius: 7,
+      }] },
+      options,
+    };
+  } else if (type === "waterfall") {
+    const yi = columns.indexOf(ys[0]);
+    let running = 0;
+    const steps = rows.map(r => {
+      const start = running;
+      running += Number(r[yi]);
+      return { label: String(r[xi]), range: [start, running], delta: Number(r[yi]) };
+    });
+    steps.push({ label: "Total", range: [0, running], delta: running, total: true });
+    const options = baseOptions(visual);
+    options.plugins.tooltip.callbacks = { label: c => ` ${formatMetric(steps[c.dataIndex].delta, visual.format)}` };
+    config = {
+      type: "bar",
+      data: { labels: steps.map(s => s.label), datasets: [{
+        data: steps.map(s => s.range), borderRadius: 4,
+        backgroundColor: steps.map(s => s.total ? PALETTE[0] : s.delta >= 0 ? POSITIVE : NEGATIVE),
+      }] },
+      options,
+    };
+  } else if (type === "combo") {
+    const [barY, lineY] = ys;
+    const options = baseOptions(visual);
+    options.plugins.legend.display = true;
+    options.scales.y1 = {
+      position: "right", grid: { display: false },
+      ticks: { color: muted, callback: v => formatMetric(v, formatFor(lineY, visual) === "percent" ? "percent" : "number") },
+    };
+    config = {
+      data: {
+        labels: rows.map(r => String(r[xi])),
+        datasets: [
+          { type: "bar", label: prettyLabel(barY), data: rows.map(r => Number(r[columns.indexOf(barY)])), backgroundColor: color(PALETTE[0], 0.75), borderRadius: 4, yAxisID: "y", order: 2 },
+          { type: "line", label: prettyLabel(lineY), data: rows.map(r => Number(r[columns.indexOf(lineY)])), borderColor: PALETTE[3], backgroundColor: PALETTE[3], cubicInterpolationMode: "monotone", tension: 0.4, pointRadius: 3, yAxisID: "y1", order: 1 },
+        ],
+      },
+      options,
+    };
+  } else {
+    let labels, datasets;
+    if (hasSeries) {
+      const p = pivot(visual);
+      labels = p.labels;
+      datasets = p.names.map((n, i) => ({ label: n, data: p.matrix[i] }));
+    } else {
+      labels = rows.map(r => String(r[xi]));
+      datasets = ys.map(y => ({ label: prettyLabel(y), data: rows.map(r => Number(r[columns.indexOf(y)])) }));
+    }
+    const isLine = type === "line";
+    const stacked = type === "stacked_bar";
+    const single = datasets.length === 1 && !isLine;
+    datasets.forEach((d, i) => Object.assign(d, isLine
+      ? { borderColor: PALETTE[i % PALETTE.length], backgroundColor: PALETTE[i % PALETTE.length], cubicInterpolationMode: "monotone", tension: 0.4, pointRadius: 2.5, spanGaps: true }
+      : { backgroundColor: single ? d.data.map(v => v < 0 ? NEGATIVE : PALETTE[0]) : PALETTE[i % PALETTE.length], borderRadius: stacked ? 0 : 4 }));
+    const horizontal = !isLine && (labels.length > 8 || Math.max(...labels.map(l => l.length)) > 14);
+    const options = baseOptions(visual, { indexAxis: horizontal ? "y" : "x" });
+    options.plugins.legend.display = datasets.length > 1;
+    options.plugins.tooltip.callbacks = { label: c => ` ${c.dataset.label}: ${formatMetric(horizontal ? c.parsed.x : c.parsed.y, visual.format)}` };
+    if (horizontal) {
+      [options.scales.x, options.scales.y] = [options.scales.y, options.scales.x];
+      options.scales.y.ticks.autoSkip = false;
+      body.style.height = Math.max(300, labels.length * 30 + 80) + "px";
+    }
+    if (stacked) {
+      options.scales.x.stacked = true;
+      options.scales.y.stacked = true;
+    }
+    config = { type: isLine ? "line" : "bar", data: { labels, datasets }, options };
+  }
+  new Chart(canvas, config);
+}
+
+function renderVisual(container, visual) {
+  container.innerHTML = `<h4 class="visual-title">${escapeHtml(visual.title)}</h4><div></div>`;
+  const body = container.lastElementChild;
+  if (!visual.rows.length) {
+    body.innerHTML = `<p class="empty">Sin datos para mostrar.</p>`;
+    return;
+  }
+  try {
+    if (visual.type === "kpi") renderKpis(body, visual);
+    else if (visual.type === "table") renderDetailTable(body, visual);
+    else if (visual.type === "heatmap") renderHeatmap(body, visual);
+    else renderChart(body, visual);
+  } catch (e) {
+    body.innerHTML = "";
+    body.style.height = "";
+    renderDetailTable(body, visual);
+  }
 }
 
 function addUserMessage(text) {
@@ -269,16 +436,17 @@ function addAnswer(data) {
   el.className = "card";
   const badge = data.approved
     ? `<span class="badge ok">✓ Validado</span>` : `<span class="badge warn">⚠ Revisar: el validador tuvo observaciones</span>`;
+  const queries = data.visuals.map((v, i) =>
+    `<p class="query-title">${i + 1}. ${escapeHtml(v.title)}</p><pre><button class="copy" data-i="${i}">Copiar</button>${escapeHtml(v.sql)}</pre>`).join("");
   el.innerHTML = `
     <p class="answer">${escapeHtml(data.answer)}</p>
-    <div class="meta">${badge}<span>${data.steps.length} pasos · ${data.seconds} s</span></div>
-    <div class="chart"><canvas></canvas></div>
-    <details><summary>Ver datos (${data.rows.length} filas)</summary>${renderTable(data.columns, data.rows)}</details>
-    <details><summary>Ver consulta SQL</summary><pre><button class="copy">Copiar</button>${escapeHtml(data.sql)}</pre></details>
+    <div class="meta">${badge}<span>${data.visuals.length} ${data.visuals.length === 1 ? "visual" : "visuales"} · ${data.steps.length} pasos · ${data.seconds} s</span></div>
+    <div class="visuals">${data.visuals.map(() => `<section class="visual"></section>`).join("")}</div>
+    <details><summary>Ver consultas SQL (${data.visuals.length})</summary>${queries}</details>
     <details><summary>Cómo llegó a la respuesta</summary>${renderSteps(data.steps, data.reviews)}</details>`;
   thread.appendChild(el);
-  el.querySelector(".copy").onclick = e => { navigator.clipboard.writeText(data.sql); e.target.textContent = "Copiado"; };
-  renderVisual(el.querySelector(".chart"), data);
+  el.querySelectorAll(".copy").forEach(b => b.onclick = e => { navigator.clipboard.writeText(data.visuals[b.dataset.i].sql); e.target.textContent = "Copiado"; });
+  el.querySelectorAll(".visual").forEach((section, i) => renderVisual(section, data.visuals[i]));
   el.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 

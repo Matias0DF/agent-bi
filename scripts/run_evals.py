@@ -27,7 +27,7 @@ def run_agent(question: str):
     from agent_bi.agent import ask
 
     r = ask(question)
-    return r.answer, r.sql, r.columns, r.rows
+    return r.answer, r.sql, [], r.rows
 
 
 def run_graph(question: str):
@@ -35,7 +35,7 @@ def run_graph(question: str):
     from agent_bi.graph import ask
 
     r = ask(question)
-    return r.answer, r.sql, r.columns, r.rows
+    return r.answer, r.sql, [], r.rows
 
 
 VARIANTS = {"single": run_single, "agent": run_agent, "graph": run_graph}

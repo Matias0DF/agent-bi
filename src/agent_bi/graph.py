@@ -6,19 +6,29 @@ from typing import Annotated, TypedDict
 from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel
 
-from agent_bi.agent import MAX_TURNS, MODEL, SYSTEM_PROMPT, AgentResult, _client, call_model, execute_tool, fallback_args
+from agent_bi.agent import (
+    MAX_TURNS,
+    MODEL,
+    SYSTEM_PROMPT,
+    AgentResult,
+    _client,
+    call_model,
+    execute_tool,
+    fallback_args,
+    run_visuals,
+)
 from agent_bi import usage
-from agent_bi.db import get_schema, run_query
+from agent_bi.db import get_schema
 from agent_bi.rag import get_docs, search_docs
 
 MAX_REVISIONS = 2
 VALIDATOR_MODEL = os.getenv("VALIDATOR_MODEL", MODEL)
 
-VALIDATOR_PROMPT = """Sos un revisor de calidad de un equipo de datos. Un analista respondió una pregunta de negocio con una consulta SQL.
+VALIDATOR_PROMPT = """Sos un revisor de calidad de un equipo de datos. Un analista respondió una pregunta de negocio con uno o más visuales, cada uno con su consulta SQL.
 Tu trabajo es detectar errores antes de que la respuesta llegue al usuario.
 
 Revisá:
-- Que la SQL responda exactamente lo que se preguntó.
+- Que el primer visual responda exactamente lo que se preguntó, y que los demás sean coherentes con él.
 - Que respete las definiciones de la documentación (métricas, períodos, estados de orden, regiones).
 - Que no haya errores típicos: JOINs que dupliquen montos, contar customer_id en vez de customer_unique_id, fechas mal filtradas.
 - Que los números del resultado sean razonables y coincidan con lo que dice la respuesta.
@@ -30,11 +40,8 @@ REVIEW_TEMPLATE = """Documentación del negocio:
 
 Pregunta del usuario: {question}
 
-SQL del analista:
-{sql}
-
-Resultado ({total} filas, se muestran hasta 20):
-{rows}
+Visuales del analista:
+{visuals}
 
 Respuesta del analista: {answer}"""
 
@@ -52,10 +59,8 @@ class State(TypedDict):
     reviews: Annotated[list, operator.add]
     turns: int
     answer: str
-    sql: str
-    chart: dict
-    columns: list
-    rows: list
+    visuals: list
+    finalize_error: str
 
 
 def _pending_tool_calls(state: State) -> list:
@@ -84,16 +89,32 @@ def nudge(state: State) -> dict:
 
 
 def finalize(state: State) -> dict:
-    """Nodo final: guarda la respuesta y ejecuta la SQL entregada."""
-    submit = next(b for b in _pending_tool_calls(state) if b.name == "submit_answer")
-    columns, rows = run_query(submit.input["sql"])
-    return {
-        "answer": submit.input["answer"],
-        "sql": submit.input["sql"],
-        "chart": submit.input["chart"],
-        "columns": columns,
-        "rows": rows,
-    }
+    """Nodo final: ejecuta la SQL de cada visual; si alguna falla, se la devuelve al analista."""
+    calls = _pending_tool_calls(state)
+    submit = next(b for b in calls if b.name == "submit_answer")
+    try:
+        visuals = run_visuals(submit.input["visuals"])
+    except ValueError as e:
+        results = [
+            {"type": "tool_result", "tool_use_id": b.id, "content": str(e), "is_error": True}
+            if b.name == "submit_answer"
+            else execute_tool(b, [])
+            for b in calls
+        ]
+        return {"finalize_error": str(e), "messages": [{"role": "user", "content": results}]}
+    return {"answer": submit.input["answer"], "visuals": visuals, "finalize_error": ""}
+
+
+def describe_visuals(visuals: list[dict]) -> str:
+    """Resume cada visual con su SQL y las primeras filas para el validador."""
+    parts = []
+    for i, v in enumerate(visuals, 1):
+        preview = [dict(zip(v["columns"], r)) for r in v["rows"][:40]]
+        parts.append(
+            f"### Visual {i}: {v['title']} ({v['type']})\nSQL:\n{v['sql']}\n"
+            f"Resultado ({len(v['rows'])} filas, hasta 40): {json.dumps(preview, default=str, ensure_ascii=False)}"
+        )
+    return "\n\n".join(parts)
 
 
 def validator(state: State) -> dict:
@@ -101,7 +122,6 @@ def validator(state: State) -> dict:
     titles = {t for s in state["steps"] if s["tool"] == "search_docs" for t in s["output"]}
     titles |= {d["title"] for d in search_docs(state["question"])}
     docs = get_docs(sorted(titles))
-    preview = [dict(zip(state["columns"], r)) for r in state["rows"][:20]]
     response = _client.beta.messages.parse(
         model=VALIDATOR_MODEL,
         max_tokens=4000,
@@ -113,9 +133,7 @@ def validator(state: State) -> dict:
             "content": REVIEW_TEMPLATE.format(
                 docs="\n\n".join(f"### {d['title']}\n{d['content']}" for d in docs),
                 question=state["question"],
-                sql=state["sql"],
-                total=len(state["rows"]),
-                rows=json.dumps(preview, default=str, ensure_ascii=False),
+                visuals=describe_visuals(state["visuals"]),
                 answer=state["answer"],
             ),
         }],
@@ -145,6 +163,11 @@ def route_after_analyst(state: State) -> str:
     return "tools" if calls else "nudge"
 
 
+def route_after_finalize(state: State) -> str:
+    """Si alguna consulta falló, vuelve al analista; si no, pasa al validador."""
+    return "analyst" if state["finalize_error"] else "validator"
+
+
 def route_after_validator(state: State) -> str:
     """Si el revisor rechazó y quedan revisiones, vuelve al analista."""
     last = state["reviews"][-1]
@@ -166,7 +189,7 @@ def build_graph():
     graph.add_conditional_edges("analyst", route_after_analyst, ["tools", "nudge", "finalize"])
     graph.add_edge("tools", "analyst")
     graph.add_edge("nudge", "analyst")
-    graph.add_edge("finalize", "validator")
+    graph.add_conditional_edges("finalize", route_after_finalize, ["analyst", "validator"])
     graph.add_conditional_edges("validator", route_after_validator, ["analyst", END])
     return graph.compile()
 
@@ -195,15 +218,8 @@ def ask(question: str, history: list[dict] | None = None) -> AgentResult:
             "steps": [],
             "reviews": [],
             "turns": 0,
+            "finalize_error": "",
         },
         {"recursion_limit": 50},
     )
-    return AgentResult(
-        answer=state["answer"],
-        sql=state["sql"],
-        chart=state["chart"],
-        columns=state["columns"],
-        rows=state["rows"],
-        steps=state["steps"],
-        reviews=state["reviews"],
-    )
+    return AgentResult(answer=state["answer"], visuals=state["visuals"], steps=state["steps"], reviews=state["reviews"])

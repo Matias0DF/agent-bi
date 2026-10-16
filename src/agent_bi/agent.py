@@ -27,8 +27,13 @@ La respuesta debe:
 - Montos en reales (R$), con separador de miles.
 - Si interpretaste algo ambiguo, aclararlo brevemente.
 
-Para el gráfico, diseñá la consulta final pensando en cómo se va a ver:
-- Si comparás períodos o grupos (por ejemplo 2017 vs 2018, Q1 vs Q2), poné cada uno en su propia columna y pasalas todas en "y".
+Visuales (en submit_answer):
+- Cada visual tiene su propia consulta SQL. Ejecutá cada una con run_sql antes de entregarla.
+- Pregunta simple: 1 visual. Análisis más amplio: 2 o 3 visuales que se complementen, por ejemplo KPIs + evolución + tabla de detalle. Nunca más de 4.
+- El primer visual siempre responde directamente la pregunta.
+- Si hay 2 o más visuales, el último es una tabla de detalle ("table") con las dimensiones y medidas usadas en la respuesta. Tiene que sumar información (todas las medidas citadas en la respuesta, o un desglose más fino), no repetir la consulta de otro visual.
+- Comparación de períodos o grupos fijos (2017 vs 2018): cada uno en su propia columna, pasalas todas en "y".
+- Una dimensión que se reparte en series (por categoría, por región): devolvé formato largo (x, dimensión, valor) y poné la dimensión en "series". Limitá las series a 6 o menos agrupando el resto como 'Otros'.
 - Porcentajes en escala 0-100, redondeados a 2 decimales.
 """
 
@@ -66,40 +71,46 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "answer": {"type": "string", "description": "Respuesta en lenguaje natural."},
-                "sql": {"type": "string", "description": "La consulta SQL final que respalda la respuesta."},
-                "chart": {
-                    "type": "object",
-                    "description": "Visualización del resultado de la consulta final.",
-                    "properties": {
-                        "type": {
-                            "type": "string",
-                            "enum": ["bar", "line", "pie", "kpi", "none"],
-                            "description": (
-                                "bar: comparar categorías (una o varias series). "
-                                "line: evolución en el tiempo (una o varias series). "
-                                "pie: proporciones de un total, una sola serie y pocas categorías. "
-                                "kpi: el resultado es uno o pocos números destacados en una sola fila. "
-                                "none: una tabla es más clara que un gráfico."
-                            ),
+                "visuals": {
+                    "type": "array",
+                    "description": "De 1 a 4 visuales. El primero responde la pregunta; si hay varios, el último es una tabla de detalle.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "enum": ["kpi", "bar", "stacked_bar", "line", "combo", "scatter", "waterfall", "heatmap", "pie", "table"],
+                                "description": (
+                                    "kpi: 1 a 4 números destacados en una sola fila. "
+                                    "bar: comparar categorías (una o varias medidas en y, o una dimensión en series). "
+                                    "stacked_bar: composición apilada; x = categoría o período, series = dimensión que se apila. "
+                                    "line: evolución en el tiempo; varias medidas en y o una dimensión en series. "
+                                    "combo: barras para y[0] y línea para y[1] con eje propio (por ejemplo ventas y cantidad de órdenes). "
+                                    "scatter: relación entre dos medidas; x e y[0] numéricas, series = etiqueta de cada punto. "
+                                    "waterfall: cómo distintas partes suman a un total o explican una variación; x = partes, y[0] = aporte (positivo o negativo). "
+                                    "heatmap: medida cruzada por dos dimensiones; x = columnas, series = filas, y[0] = valor. "
+                                    "pie: proporciones de un total, una medida y hasta 6 categorías. "
+                                    "table: tabla de detalle con todas las columnas de la consulta."
+                                ),
+                            },
+                            "title": {"type": "string"},
+                            "sql": {"type": "string", "description": "Consulta SELECT que alimenta este visual."},
+                            "x": {"type": "string", "description": "Columna del eje X o de categorías. Vacío para kpi y table."},
+                            "y": {"type": "array", "items": {"type": "string"}, "description": "Columnas numéricas."},
+                            "series": {"type": "string", "description": "Columna que separa series, filas del heatmap o etiquetas del scatter. Vacío si no aplica."},
+                            "delta": {"type": "string", "description": "Solo kpi: columna con la variación % de la primera medida contra el período anterior. Vacío si no aplica."},
+                            "format": {
+                                "type": "string",
+                                "enum": ["number", "currency", "percent"],
+                                "description": "currency para montos en R$, percent si los valores ya están en escala 0-100.",
+                            },
                         },
-                        "x": {"type": "string", "description": "Columna de categorías o fechas. Vacío para kpi."},
-                        "y": {
-                            "type": "array",
-                            "items": {"type": "string"},
-                            "description": "Columnas numéricas a mostrar. Varias columnas = varias series (por ejemplo 2017 y 2018).",
-                        },
-                        "format": {
-                            "type": "string",
-                            "enum": ["number", "currency", "percent"],
-                            "description": "currency para montos en R$, percent si los valores ya están en escala 0-100.",
-                        },
-                        "title": {"type": "string"},
+                        "required": ["type", "title", "sql", "x", "y", "series", "delta", "format"],
+                        "additionalProperties": False,
                     },
-                    "required": ["type", "x", "y", "format", "title"],
-                    "additionalProperties": False,
                 },
             },
-            "required": ["answer", "sql", "chart"],
+            "required": ["answer", "visuals"],
             "additionalProperties": False,
         },
         "strict": True,
@@ -110,12 +121,31 @@ TOOLS = [
 @dataclass
 class AgentResult:
     answer: str = ""
-    sql: str = ""
-    chart: dict = field(default_factory=dict)
-    columns: list[str] = field(default_factory=list)
-    rows: list[tuple] = field(default_factory=list)
+    visuals: list[dict] = field(default_factory=list)
     steps: list[dict] = field(default_factory=list)
     reviews: list[dict] = field(default_factory=list)
+
+    @property
+    def sql(self) -> str:
+        """Todas las consultas de la respuesta, separadas."""
+        return "\n\n".join(v["sql"] for v in self.visuals)
+
+    @property
+    def rows(self) -> list[tuple]:
+        """Las filas de todos los visuales juntas."""
+        return [row for v in self.visuals for row in v["rows"]]
+
+
+def run_visuals(visuals: list[dict]) -> list[dict]:
+    """Ejecuta la SQL de cada visual y le agrega columnas y filas."""
+    results = []
+    for i, visual in enumerate(visuals[:4], 1):
+        try:
+            columns, rows = run_query(visual["sql"])
+        except Exception as e:
+            raise ValueError(f"La consulta del visual {i} ('{visual['title']}') falló: {e}") from e
+        results.append({**visual, "columns": columns, "rows": rows})
+    return results
 
 
 _client = anthropic.Anthropic()
@@ -190,13 +220,21 @@ def ask(question: str) -> AgentResult:
         messages.append({"role": "assistant", "content": response.content})
         tool_calls = [b for b in response.content if b.type == "tool_use"]
 
-        for block in tool_calls:
-            if block.name == "submit_answer":
-                result.answer = block.input["answer"]
-                result.sql = block.input["sql"]
-                result.chart = block.input["chart"]
-                result.columns, result.rows = run_query(result.sql)
+        submit = next((b for b in tool_calls if b.name == "submit_answer"), None)
+        if submit:
+            try:
+                result.visuals = run_visuals(submit.input["visuals"])
+                result.answer = submit.input["answer"]
                 return result
+            except ValueError as e:
+                results = [
+                    {"type": "tool_result", "tool_use_id": b.id, "content": str(e), "is_error": True}
+                    if b.name == "submit_answer"
+                    else execute_tool(b, result.steps)
+                    for b in tool_calls
+                ]
+                messages.append({"role": "user", "content": results})
+                continue
 
         if not tool_calls:
             messages.append({"role": "user", "content": "Para terminar, llamá a submit_answer."})
